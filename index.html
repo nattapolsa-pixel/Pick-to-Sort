@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pick to Sort Performance Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=25" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">📊 Pick to Sort</p>
+          <h1>Performance Dashboard</h1>
+        </div>
+        <div class="meta-strip">
+          <span id="metaRows">📦 0 รายการ</span>
+          <span id="metaLatestJob">⏰ ข้อมูลล่าสุด: -</span>
+          <span id="loadStatus">⟳ กำลังโหลด</span>
+        </div>
+      </header>
+
+      <section class="filters" aria-label="Filters">
+        <label data-menu-section-exclude="daily">
+          <span>🗓️ เริ่มวันที่</span>
+          <input id="dateFrom" type="date" />
+        </label>
+        <label data-menu-section-exclude="daily">
+          <span>🗓️ ถึงวันที่</span>
+          <input id="dateTo" type="date" />
+        </label>
+        <label data-menu-section="daily" class="menu-hidden">
+          <span>🗓️ เดือน</span>
+          <input id="monthFilter" type="month" />
+        </label>
+        <label class="search-box">
+          <span>🔍 ค้นหา</span>
+          <input id="searchInput" type="search" placeholder="Wave, Item, รหัส, ชื่อเล่น" />
+        </label>
+            <label class="shift-box">
+          <span>⏱️ กะ</span>
+          <select id="shiftFilter">
+            <option value="all">ทั้งหมด</option>
+            <optgroup label="DAY">
+              <option value="day">DAY รวม OT</option>
+              <option value="day_normal">DAY 08:00-17:00</option>
+              <option value="day_ot">OT DAY 17:30-20:00</option>
+            </optgroup>
+            <optgroup label="NIGHT">
+              <option value="night">NIGHT รวม OT</option>
+              <option value="night_normal">NIGHT 20:00-05:00</option>
+              <option value="night_ot">OT NIGHT 05:30-08:00</option>
+            </optgroup>
+            <option value="transition">พัก/เปลี่ยนกะ</option>
+          </select>
+        </label>
+        <div class="segmented" aria-label="People role">
+          <button id="pickMode" class="active" type="button">👆 Pick</button>
+          <button id="sortMode" type="button">📮 Sort</button>
+        </div>
+        <button id="refreshBtn" class="secondary" type="button">🔄 รีเฟรช</button>
+        <button id="resetBtn" class="secondary" type="button">✕ ล้าง</button>
+        <button id="exportBtn" class="primary" type="button">💾 CSV</button>
+      </section>
+
+      <div class="dashboard-layout">
+        <nav class="menu-tabs" aria-label="Dashboard menu">
+          <div class="menu-label">
+            <span>MENU</span>
+            <strong>Dashboard</strong>
+          </div>
+          <button class="active" data-menu-tab="overview" type="button">ภาพรวม</button>
+          <button data-menu-tab="daily" type="button">รายวัน / เวลา</button>
+          <button data-menu-tab="people" type="button">พนักงาน / Wave</button>
+          <button data-menu-tab="worklist" type="button">รายการ</button>
+
+        </nav>
+
+        <main>
+        <section id="kpiGrid" class="kpi-grid" aria-label="KPIs" data-menu-section="overview"></section>
+
+        <section class="panel shift-summary-panel" data-menu-section="overview">
+          <div class="panel-head">
+            <h2>📊 สรุป Day / Night</h2>
+            <span id="dayNightHint"></span>
+          </div>
+          <div id="dayNightCards" class="shift-summary-cards"></div>
+        </section>
+
+
+        <section class="panel" data-menu-section="daily">
+          <div class="panel-head">
+            <h2>📅 สรุปรายวัน (แยก DAY / NIGHT)</h2>
+            <span id="dayNightByDateHint"></span>
+          </div>
+          <div class="table-wrap compact">
+            <table class="day-night-by-date">
+              <colgroup>
+                <col />
+                <col class="num" />
+                <col class="num" />
+                <col class="num" />
+                <col class="num" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>วันที่</th>
+                  <th class="num col-day">☀️ DAY ชิ้น</th>
+                  <th class="num col-night">🌙 NIGHT ชิ้น</th>
+                  <th class="num col-total">รวม</th>
+                  <th class="num col-note">DAY% / NIGHT%</th>
+                </tr>
+              </thead>
+              <tbody id="dayNightByDateTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel panel-large" data-menu-section="daily" style="margin-top: 16px;">
+          <div class="panel-head">
+            <h2>📈 แนวโน้มรายวัน</h2>
+            <span id="dailyHint"></span>
+          </div>
+          <div id="dailyChart" class="chart-box" style="padding: 24px;"></div>
+        </section>
+
+        <section class="panel" data-menu-section="people" style="margin-bottom: 16px;">
+          <div class="panel-head">
+            <h2>👥 พนักงาน</h2>
+            <span id="peopleHint"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>รหัส</th>
+                  <th>ชื่อเล่น</th>
+                  <th class="num">ชิ้น</th>
+                  <th class="num">แพ็ค</th>
+                  <th class="num">Wave</th>
+                  <th class="num">ชิ้น/hr</th>
+                  <th class="num">เวลาเฉลี่ย</th>
+                </tr>
+              </thead>
+              <tbody id="peopleTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="grid-two align-start" data-menu-section="people">
+          <article class="panel">
+            <div class="panel-head">
+              <h2>⏲️ Slot เวลา</h2>
+              <span id="slotHint"></span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>เวลา</th>
+                    <th>สัดส่วน (Pick/Sort)</th>
+                    <th class="num">ชิ้น</th>
+                    <th class="num">แพ็ค</th>
+                  </tr>
+                </thead>
+                <tbody id="slotTable"></tbody>
+              </table>
+              <div id="slotLegend" class="legend" style="padding: 16px 24px; border-top: 1px solid rgba(255, 255, 255, 0.05);"></div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h2>📦 ต่อ Wave</h2>
+              <span id="waveHint"></span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Wave</th>
+                    <th>วันที่</th>
+                    <th class="num">แพ็ค</th>
+                    <th class="num">เวลา Pick</th>
+                    <th class="num">เวลา Sort</th>
+                    <th class="num">เวลาเฉลี่ย</th>
+                  </tr>
+                </thead>
+                <tbody id="waveTable"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel" data-menu-section="worklist">
+          <div class="panel-head">
+            <h2>รายการ</h2>
+            <span id="slowHint"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Wave</th>
+                  <th>กะ</th>
+                  <th>วันที่กะ</th>
+                  <th>Item</th>
+                  <th class="num">Qty</th>
+                  <th>Picker</th>
+                  <th>Sorter</th>
+                  <th>Pick</th>
+                  <th>Sort</th>
+                  <th class="num">เวลา</th>
+                </tr>
+              </thead>
+              <tbody id="slowTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+
+        </main>
+      </div>
+    </div>
+
+    <script src="data.js?v=10"></script>
+    <script src="app.js?v=37"></script>
+  </body>
+</html>
