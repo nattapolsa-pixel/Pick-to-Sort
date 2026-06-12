@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="logo.png" />
-    <link rel="stylesheet" href="styles.css?v=25" />
+    <link rel="stylesheet" href="styles.css?v=27" />
   </head>
   <body>
     <div class="app-shell">
@@ -39,7 +39,7 @@
         </label>
         <label class="search-box">
           <span>🔍 ค้นหา</span>
-          <input id="searchInput" type="search" placeholder="Wave, Item, รหัส, ชื่อเล่น" />
+          <input id="searchInput" type="search" placeholder="Wave, Item, รหัส, ชื่อจริง" />
         </label>
             <label class="shift-box">
           <span>⏱️ กะ</span>
@@ -64,7 +64,7 @@
         </div>
         <button id="refreshBtn" class="secondary" type="button">🔄 รีเฟรช</button>
         <button id="resetBtn" class="secondary" type="button">✕ ล้าง</button>
-        <button id="exportBtn" class="primary" type="button">💾 CSV</button>
+        <button id="exportBtn" class="primary" type="button">💾 Excel</button>
       </section>
 
       <div class="dashboard-layout">
@@ -92,6 +92,8 @@
         </section>
 
 
+
+
         <section class="panel" data-menu-section="daily">
           <div class="panel-head">
             <h2>📅 สรุปรายวัน (แยก DAY / NIGHT)</h2>
@@ -109,8 +111,8 @@
               <thead>
                 <tr>
                   <th>วันที่</th>
-                  <th class="num col-day">☀️ DAY ชิ้น</th>
-                  <th class="num col-night">🌙 NIGHT ชิ้น</th>
+                  <th class="num col-day">☀️ DAY</th>
+                  <th class="num col-night">🌙 NIGHT</th>
                   <th class="num col-total">รวม</th>
                   <th class="num col-note">DAY% / NIGHT%</th>
                 </tr>
@@ -138,7 +140,7 @@
               <thead>
                 <tr>
                   <th>รหัส</th>
-                  <th>ชื่อเล่น</th>
+                  <th>ชื่อจริง</th>
                   <th class="num">ชิ้น</th>
                   <th class="num">แพ็ค</th>
                   <th class="num">Wave</th>
@@ -162,7 +164,7 @@
                 <thead>
                   <tr>
                     <th>เวลา</th>
-                    <th>สัดส่วน (Pick/Sort)</th>
+                    <th>สัดส่วน</th>
                     <th class="num">ชิ้น</th>
                     <th class="num">แพ็ค</th>
                   </tr>
@@ -184,6 +186,7 @@
                   <tr>
                     <th>Wave</th>
                     <th>วันที่</th>
+                    <th class="num">ชิ้น</th>
                     <th class="num">แพ็ค</th>
                     <th class="num">เวลา Pick</th>
                     <th class="num">เวลา Sort</th>
@@ -207,9 +210,10 @@
                 <tr>
                   <th>Wave</th>
                   <th>กะ</th>
-                  <th>วันที่กะ</th>
+                  <th>วันที่</th>
                   <th>Item</th>
-                  <th class="num">Qty</th>
+                  <th class="num">ชิ้น</th>
+                  <th class="num">แพ็ค</th>
                   <th>Picker</th>
                   <th>Sorter</th>
                   <th>Pick</th>
@@ -228,6 +232,6 @@
     </div>
 
     <script src="data.js?v=10"></script>
-    <script src="app.js?v=38"></script>
+    <script src="app.js?v=43"></script>
   </body>
 </html>
