@@ -1247,7 +1247,7 @@ function renderDailyChart(rows) {
   const pad = { top: 40, right: 60, bottom: 50, left: 64 };
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
-  const maxQty = Math.max(...daily.map((day) => day.qtyPack), 1);
+  const maxQty = Math.max(...daily.map((day) => day.qtyEach), 1);
   const maxCycle = Math.max(...daily.map((day) => day.avgCycle || 0), 1);
   const barW = Math.max(12, innerW / daily.length - 8);
   const xFor = (index) => pad.left + (index * innerW) / Math.max(1, daily.length - 1);
@@ -1267,7 +1267,7 @@ function renderDailyChart(rows) {
   const bars = daily
     .map((day, index) => {
       const x = xFor(index) - barW / 2;
-      const y = yQty(day.qtyPack);
+      const y = yQty(day.qtyEach);
       const h = pad.top + innerH - y;
       // Ensure minimum height for visibility
       const finalH = Math.max(h, 4);
@@ -1275,9 +1275,9 @@ function renderDailyChart(rows) {
       return `
         <g class="chart-group">
           <rect class="chart-bar" x="${x}" y="${finalY}" width="${barW}" height="${finalH}" rx="4" fill="url(#barGrad)" opacity="0.85">
-            <title>${html(day.date)}: ${fmt.format(day.qtyPack)} แพ็ค</title>
+            <title>${html(day.date)}: ${fmt.format(day.qtyEach)} ชิ้น</title>
           </rect>
-          <text class="chart-val-hover" x="${xFor(index)}" y="${finalY - 8}" text-anchor="middle">${fmt.format(day.qtyPack)}</text>
+          <text class="chart-val-hover" x="${xFor(index)}" y="${finalY - 8}" text-anchor="middle">${fmt.format(day.qtyEach)}</text>
         </g>`;
     })
     .join("");
@@ -1324,11 +1324,11 @@ function renderDailyChart(rows) {
         .join("")}
         
       ${labels}
-      <text class="axis-label axis-title" x="${pad.left}" y="14">Qty (แพ็ค)</text>
+      <text class="axis-label axis-title" x="${pad.left}" y="14">Qty (ชิ้น)</text>
       <text class="axis-label axis-title" x="${width - pad.right}" y="14" text-anchor="end">เฉลี่ย (นาที)</text>
     </svg>
     <div class="legend" style="margin-top: 10px;">
-      <span><i style="background: linear-gradient(135deg, #38bdf8, #0284c7)"></i>Qty แพ็ค</span>
+      <span><i style="background: linear-gradient(135deg, #38bdf8, #0284c7)"></i>Qty ชิ้น</span>
       <span><i style="background: linear-gradient(135deg, #818cf8, #c084fc)"></i>Pick to Sort เฉลี่ย</span>
     </div>`;
 }
