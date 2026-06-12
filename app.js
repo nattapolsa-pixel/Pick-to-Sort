@@ -749,11 +749,13 @@ function metricMinutes(value) {
 }
 
 function rowDate(record) {
-  // Prefer explicit shift date when available
+  // Date filters should match Google Sheet Column I (Picked Date).
+  if (record.pick?.date) return record.pick.date;
+
+  // Fallback to shift/sort date and keep night-window adjustment only when Picked Date is missing.
   if (record.shift?.date) return record.shift.date;
 
-  // Fallback to pick/sort date but adjust for night windows that belong to previous day
-  const date = record.pick?.date || record.sort?.date || "";
+  const date = record.sort?.date || "";
   const time = record.pick?.time || record.sort?.time || "";
   if (!date) return "";
 
