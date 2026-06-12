@@ -2270,6 +2270,115 @@ function deltaHtml(current, prev, lowerIsBetter = false) {
 
 // ───────────────────────────────────────────────────────────────────────────
 
+function renderPendingSort(rows) {
+  const pendingRows = rows.filter((row) => row.pick.at && !row.sort.at);
+  const totalRows = rows.filter((row) => row.pick.at);
+  const sortedRows = totalRows.length - pendingRows.length;
+  const sortPct = totalRows.length ? (sortedRows / totalRows.length) * 100 : 0;
+  const pendingPct = totalRows.length ? (pendingRows.length / totalRows.length) * 100 : 0;
+
+  const pendingQtyEach = sumBy(pendingRows, "qtyEach");
+  const pendingQtyPack = sumBy(pendingRows, "qtyPack");
+
+  const hint = $("#pendingSortHint");
+  if (hint) hint.textContent = `${fmt.format(totalRows.length)} รายการที่ Pick แล้ว`;
+
+  const container = $("#pendingSortContent");
+  if (!container) return;
+
+  if (!pendingRows.length) {
+    container.innerHTML = `
+      <div class="pending-sort-empty">
+        <div class="pending-sort-done-icon">✅</div>
+        <strong>Sort ครบแล้ว!</strong>
+        <span>ทุกรายการที่ Pick แล้วถูก Sort หมดแล้ว</span>
+      </div>`;
+    return;
+  }
+
+  // Group pending by shift
+  const pendingDay = pendingRows.filter((r) => r.shift?.group === "day");
+  const pendingNight = pendingRows.filter((r) => r.shift?.group === "night");
+  const pendingOther = pendingRows.filter((r) => !r.shift || !["day", "night"].includes(r.shift?.group));
+
+  // Top 5 pending waves
+  const waveMap = new Map();
+  pendingRows.forEach((row) => {
+    const w = row.wave || "ไม่ทราบ";
+    if (!waveMap.has(w)) waveMap.set(w, { wave: w, count: 0, qtyEach: 0 });
+    const entry = waveMap.get(w);
+    entry.count += 1;
+    entry.qtyEach += row.qtyEach || 0;
+  });
+  const topWaves = [...waveMap.values()].sort((a, b) => b.qtyEach - a.qtyEach).slice(0, 5);
+  const maxWaveQty = Math.max(...topWaves.map((w) => w.qtyEach), 1);
+
+  container.innerHTML = `
+    <div class="pending-sort-grid">
+      <div class="pending-main-card">
+        <div class="pending-big-number">${fmt.format(pendingRows.length)}</div>
+        <div class="pending-big-label">รายการ ยังไม่ได้ Sort</div>
+        <div class="pending-progress-wrap">
+          <div class="pending-progress-bar">
+            <div class="pending-progress-fill pending-fill-sorted" style="width:${sortPct}%"></div>
+            <div class="pending-progress-fill pending-fill-pending" style="width:${pendingPct}%"></div>
+          </div>
+          <div class="pending-progress-labels">
+            <span class="pending-sorted-label">✅ Sort แล้ว ${fmt.format(sortedRows)} (${fmt1.format(sortPct)}%)</span>
+            <span class="pending-pending-label">⏳ คงเหลือ ${fmt.format(pendingRows.length)} (${fmt1.format(pendingPct)}%)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pending-stats-row">
+        <div class="pending-stat-card pending-stat-qty">
+          <div class="pending-stat-icon">📦</div>
+          <div class="pending-stat-value">${fmt.format(pendingQtyEach)}</div>
+          <div class="pending-stat-label">ชิ้นคงเหลือ</div>
+        </div>
+        <div class="pending-stat-card pending-stat-pack">
+          <div class="pending-stat-icon">📋</div>
+          <div class="pending-stat-value">${fmt.format(pendingQtyPack)}</div>
+          <div class="pending-stat-label">แพ็คคงเหลือ</div>
+        </div>
+        <div class="pending-stat-card pending-stat-day">
+          <div class="pending-stat-icon">☀️</div>
+          <div class="pending-stat-value">${fmt.format(pendingDay.length)}</div>
+          <div class="pending-stat-label">DAY คงเหลือ</div>
+          <div class="pending-stat-sub">${fmt.format(sumBy(pendingDay, "qtyEach"))} ชิ้น</div>
+        </div>
+        <div class="pending-stat-card pending-stat-night">
+          <div class="pending-stat-icon">🌙</div>
+          <div class="pending-stat-value">${fmt.format(pendingNight.length)}</div>
+          <div class="pending-stat-label">NIGHT คงเหลือ</div>
+          <div class="pending-stat-sub">${fmt.format(sumBy(pendingNight, "qtyEach"))} ชิ้น</div>
+        </div>
+      </div>
+
+      ${topWaves.length ? `
+      <div class="pending-waves-section">
+        <div class="pending-waves-title">📌 Wave ที่ค้างมากสุด</div>
+        <div class="pending-waves-list">
+          ${topWaves.map((w, i) => {
+            const pct = (w.qtyEach / maxWaveQty) * 100;
+            return `
+            <div class="pending-wave-item">
+              <span class="pending-wave-rank">${i + 1}</span>
+              <span class="pending-wave-name">${html(w.wave)}</span>
+              <div class="pending-wave-bar-wrap">
+                <div class="pending-wave-bar" style="width:${pct}%"></div>
+              </div>
+              <span class="pending-wave-qty">${fmt.format(w.qtyEach)} ชิ้น</span>
+              <span class="pending-wave-count">${fmt.format(w.count)} รายการ</span>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>` : ""}
+    </div>`;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+
 function render() {
   syncRoleControls();
   const rows = filteredRecords();
@@ -2281,6 +2390,7 @@ function render() {
 
   renderKpis(rows, prevRows);
   renderDayNightSummary(shiftRows, prevShiftRows);
+  renderPendingSort(rows);
   renderPickSortView(rows);
   renderDailyChart(dailyRows);
 
