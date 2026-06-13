@@ -1092,6 +1092,7 @@ function renderKpis(rows, prevRows = []) {
   const sorted = rows.filter((row) => row.sort.at).length;
   const avgCycle = mean(cycles);
   const items = uniqueCount(roleRows, (row) => row.item);
+  const waveCount = uniqueCount(roleRows, (row) => row.wave);
   const sortedRate = roleRows.length ? (sorted / roleRows.length) * 100 : 0;
 
   const totalQtyEach = sumBy(roleRows, "qtyEach");
@@ -1121,6 +1122,7 @@ function renderKpis(rows, prevRows = []) {
   const pSortedRate    = hasPrev && prevRoleRows.length ? (pSorted / prevRoleRows.length) * 100 : null;
   const pAvgCycle      = hasPrev ? mean(pCycles) : null;
   const pWorkers       = hasPrev ? uniqueCount(prevRoleRows, (r) => roleWorker(r, mode).code) : null;
+  const pWaveCount     = hasPrev ? uniqueCount(prevRoleRows, (r) => r.wave) : null;
   const pTotalProd     = hasPrev ? calculateRoleProductivity(prevRows, mode) : null;
   const pDayProd       = hasPrev ? calculateRoleProductivityByShift(prevRows, mode, "day") : null;
   const pNightProd     = hasPrev ? calculateRoleProductivityByShift(prevRows, mode, "night") : null;
@@ -1161,6 +1163,13 @@ function renderKpis(rows, prevRows = []) {
       value: fmt.format(workerCount),
       note: mode === "sort" ? "Sorter" : "Picker",
       delta: kpiDelta(workerCount, pWorkers),
+    },
+    {
+      color: "green",
+      label: "Wave ทั้งหมด",
+      value: fmt.format(waveCount),
+      note: `${label} ในช่วงที่กรอง`,
+      delta: kpiDelta(waveCount, pWaveCount),
     },
     {
       color: "cyan",
