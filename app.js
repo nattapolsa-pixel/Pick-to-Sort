@@ -2,7 +2,7 @@ const DEFAULT_CONFIG = {
   sheetId: "1Rd1KWLNZPIgSFfOnM1sCLjMmGhtRFuIXfHFPYjfg74o",
   gid: "377885389",
   sheetName: "Data",
-  range: "A:P",
+  range: "A:Q",
   timeShiftHours: 0,
   rawTimeShiftHours: -7,
   autoRefreshMs: 5 * 60 * 1000,
@@ -66,6 +66,7 @@ const COLUMN_CANDIDATES = {
   sortTime: ["Sort Time", "Sorted Time", "เวลา(Sort)", "เวลา (Sort)", "เวลา Sort"],
   sortSlot: ["Sort Hour", "Sort Slot", "Sorted Slot", "Slot time (Sort)", "Slot Time Sort"],
   sortShift: ["Sort Shift", "Sorted Shift", "Shift (Sort)"],
+  branch: ["Shipto", "สาขา", "Branch", "EXT_UDF_STR10"],
 };
 
 const BASE_REQUIRED_FIELDS = ["item", "qtyEach", "qtyPack", "wave", "pickCode", "sortCode"];
@@ -638,6 +639,7 @@ function normalizeRecords(rawRows) {
       sortTime: rawValue("sortTime"),
       sortSlot: rawValue("sortSlot"),
       sortShift: rawValue("sortShift"),
+      branch: rawValue("branch"),
     };
     const pick = resolveWorkTime(source, "pick");
     const sort = resolveWorkTime(source, "sort");
@@ -678,6 +680,7 @@ function normalizeRecords(rawRows) {
       shift,
       source,
       cycleMinutes,
+      branch: source.branch,
     });
   });
 
@@ -839,6 +842,7 @@ function searchText(record) {
     record.sortShift?.label,
     record.sortShift?.window,
     record.sortShift?.date,
+    record.branch,
   ]
     .join(" ")
     .toLowerCase();
@@ -1083,6 +1087,14 @@ function renderKpis(rows, prevRows = []) {
   const nightProd = calculateRoleProductivityByShift(rows, mode, "night");
   const workerCount = uniqueCount(roleRows, (row) => roleWorker(row, mode).code);
 
+  // branch counts (total / day / night)
+  const branchAll  = new Set(roleRows.map(r => r.branch).filter(Boolean));
+  const branchDay  = new Set(roleRows.filter(r => roleShift(r, mode)?.group === "day").map(r => r.branch).filter(Boolean));
+  const branchNight = new Set(roleRows.filter(r => roleShift(r, mode)?.group === "night").map(r => r.branch).filter(Boolean));
+  const branchTotal = branchAll.size;
+  const branchDayCount = branchDay.size;
+  const branchNightCount = branchNight.size;
+
   // previous period metrics
   const hasPrev = prevRows.length > 0;
   const pCycles = prevRows.map((r) => r.cycleMinutes).filter((v) => v !== null);
@@ -1095,6 +1107,9 @@ function renderKpis(rows, prevRows = []) {
   const pTotalProd     = hasPrev ? calculateRoleProductivity(prevRows, mode) : null;
   const pDayProd       = hasPrev ? calculateRoleProductivityByShift(prevRows, mode, "day") : null;
   const pNightProd     = hasPrev ? calculateRoleProductivityByShift(prevRows, mode, "night") : null;
+  const pBranchTotal   = hasPrev ? new Set(prevRoleRows.map(r => r.branch).filter(Boolean)).size : null;
+  const pBranchDay     = hasPrev ? new Set(prevRoleRows.filter(r => roleShift(r, mode)?.group === "day").map(r => r.branch).filter(Boolean)).size : null;
+  const pBranchNight   = hasPrev ? new Set(prevRoleRows.filter(r => roleShift(r, mode)?.group === "night").map(r => r.branch).filter(Boolean)).size : null;
 
   function kpiDelta(cur, prev, lowerIsBetter = false) {
     if (!hasPrev || prev === null || prev === undefined) return "";
@@ -1150,6 +1165,13 @@ function renderKpis(rows, prevRows = []) {
       value: `${fmt1.format(nightProd.productivity)} ชิ้น/hr`,
       note: `${fmt.format(nightProd.totalQtyEach)} ชิ้น / ${fmt1.format(nightProd.totalActiveHours)} ชม.`,
       delta: hasPrev && pNightProd ? kpiDelta(nightProd.productivity, pNightProd.productivity) : "",
+    }] : []),
+    ...(branchTotal > 0 ? [{
+      color: "green",
+      label: `สาขาทั้งหมด`,
+      value: fmt.format(branchTotal),
+      note: "Unique Branches",
+      delta: kpiDelta(branchTotal, pBranchTotal),
     }] : []),
   ];
 
@@ -1598,35 +1620,70 @@ function renderSlots(rows) {
   const mode = activeMode();
   const label = roleLabel(mode);
   const visible = slotSummary(rows, mode);
-  const max = Math.max(...visible.map((slot) => slot.count), 1);
+  const maxCount = Math.max(...visible.map((s) => s.count), 1);
+  const maxQtyEach = Math.max(...visible.map((s) => s.qtyEach), 1);
+  const totalQtyEach = visible.reduce((s, v) => s + v.qtyEach, 0);
+  const totalQtyPack = visible.reduce((s, v) => s + v.qtyPack, 0);
+  const totalBranches = new Set(visible.flatMap(s => [...(s.branches || [])])).size || visible.reduce((s, v) => s + v.branchCount, 0);
+
   $("#slotHint").textContent = `${label} · ${fmt.format(visible.length)} slots`;
-  
-  if (visible.length) {
-    $("#slotTable").innerHTML = visible
-      .map((slot) => {
-        const pct = (slot.count / max) * 100;
-        const barClass = mode === "sort" ? "bar-sort" : "bar-pick";
-        return `
-          <tr title="Slot ${slot.label}&#10;• ${label}: ${fmt.format(slot.count)} รายการ | ${fmt.format(slot.qtyEach)} ชิ้น | ${fmt.format(slot.qtyPack)} แพ็ค">
-            <td><span class="tag">${slot.label}</span></td>
-            <td>
-              <div class="bar-track" style="margin: 0; width: 100%; min-width: 100px;">
-                <div class="bar-pair">
-                  <div class="${barClass}" style="width:${pct}%"></div>
-                </div>
-              </div>
-            </td>
-            <td class="num">${fmt.format(slot.qtyEach)}</td>
-            <td class="num">${fmt.format(slot.qtyPack)}</td>
-          </tr>`;
-      })
-      .join("");
-    $("#slotLegend").innerHTML = `<span><i style="background:${mode === "sort" ? "var(--indigo)" : "var(--teal)"}"></i>${label}</span>`;
-    $("#slotLegend").style.display = "";
-  } else {
-    $("#slotTable").innerHTML = `<tr><td colspan="4" class="empty">ไม่มีข้อมูล</td></tr>`;
-    $("#slotLegend").style.display = "none";
+
+  const grid = $("#slotGrid");
+  const legend = $("#slotLegend");
+
+  if (!visible.length) {
+    grid.innerHTML = `<div class="slot-empty">ไม่มีข้อมูล</div>`;
+    legend.style.display = "none";
+    return;
   }
+
+  const isPick = mode !== "sort";
+  const accentVar = isPick ? "var(--teal)" : "var(--indigo)";
+  const accentBright = isPick ? "var(--teal-bright)" : "#c4b5fd";
+  const glowVar = isPick ? "var(--teal-glow)" : "var(--indigo-glow)";
+  const gradStart = isPick ? "#0d9488" : "#7c3aed";
+  const gradEnd = isPick ? "#2dd4bf" : "#a78bfa";
+
+  grid.innerHTML = visible
+    .map((slot, idx) => {
+      const pct = (slot.qtyEach / maxQtyEach) * 100;
+      const sharePct = totalQtyEach ? ((slot.qtyEach / totalQtyEach) * 100).toFixed(1) : "0";
+      const delay = idx * 40;
+      return `
+        <div class="slot-card" style="animation-delay:${delay}ms" title="${slot.label} — ${fmt.format(slot.count)} รายการ">
+          <div class="slot-card-header">
+            <span class="slot-time-badge" style="background:${accentVar};color:#fff">${slot.label}</span>
+            <span class="slot-share" style="color:${accentBright}">${sharePct}%</span>
+          </div>
+          <div class="slot-bar-container">
+            <div class="slot-bar-bg">
+              <div class="slot-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${gradStart},${gradEnd});box-shadow:0 0 12px ${glowVar}"></div>
+            </div>
+          </div>
+          <div class="slot-card-stats">
+            <div class="slot-stat">
+              <span class="slot-stat-value">${fmt.format(slot.qtyEach)}</span>
+              <span class="slot-stat-label">ชิ้น</span>
+            </div>
+            <div class="slot-stat">
+              <span class="slot-stat-value">${fmt.format(slot.qtyPack)}</span>
+              <span class="slot-stat-label">แพ็ค</span>
+            </div>
+            <div class="slot-stat">
+              <span class="slot-stat-value" style="color:${accentBright}">${slot.branchCount ? fmt.format(slot.branchCount) : "-"}</span>
+              <span class="slot-stat-label">สาขา</span>
+            </div>
+          </div>
+        </div>`;
+    })
+    .join("");
+
+  legend.innerHTML = `
+    <div class="slot-legend-summary">
+      <span><i style="background:${accentVar}"></i>${label}</span>
+      <span class="slot-legend-totals">รวม: <strong>${fmt.format(totalQtyEach)}</strong> ชิ้น · <strong>${fmt.format(totalQtyPack)}</strong> แพ็ค · <strong>${fmt.format(totalBranches)}</strong> สาขา</span>
+    </div>`;
+  legend.style.display = "";
 }
 
 function slotSummary(rows, mode = state.peopleMode) {
@@ -1636,6 +1693,7 @@ function slotSummary(rows, mode = state.peopleMode) {
     count: 0,
     qtyEach: 0,
     qtyPack: 0,
+    branches: new Set(),
   }));
   const bySlot = new Map(slots.map((slot) => [slot.key, slot]));
   rows.forEach((row) => {
@@ -1645,9 +1703,13 @@ function slotSummary(rows, mode = state.peopleMode) {
       slot.count += 1;
       slot.qtyEach += row.qtyEach || 0;
       slot.qtyPack += row.qtyPack || 0;
+      if (row.branch) slot.branches.add(row.branch);
     }
   });
-  return slots.filter((slot) => slot.count);
+  return slots.filter((slot) => slot.count).map(slot => ({
+    ...slot,
+    branchCount: slot.branches.size,
+  }));
 }
 
 function employeeSummary(rows, mode) {
@@ -1669,11 +1731,13 @@ function employeeSummary(rows, mode) {
       const activeHours = activeMinutes / 60;
       const qtyEach = sumBy(items, "qtyEach");
       const qtyPack = sumBy(items, "qtyPack");
+      const branches = new Set(items.map((row) => row.branch).filter(Boolean));
       return {
         worker,
         qtyEach,
         qtyPack,
         waves: uniqueCount(items, (row) => row.wave),
+        branchCount: branches.size,
         activeHours,
         rateEach: activeHours ? qtyEach / activeHours : null,
         avgCycle: mean(items.map((row) => row.cycleMinutes)),
@@ -1686,7 +1750,7 @@ function renderPeople(rows) {
   const people = employeeSummary(rows, state.peopleMode).slice(0, 18);
   $("#peopleHint").textContent = state.peopleMode === "pick" ? "จัดอันดับ Pick ตามชิ้น/hr" : "จัดอันดับ Sort ตามชิ้น/hr";
   if (!people.length) {
-    $("#peopleTable").innerHTML = `<tr><td colspan="7" class="empty">ไม่มีข้อมูล</td></tr>`;
+    $("#peopleTable").innerHTML = `<tr><td colspan="8" class="empty">ไม่มีข้อมูล</td></tr>`;
     return;
   }
   const maxRate = Math.max(...people.map(p => p.rateEach || 0), 1);
@@ -1711,6 +1775,7 @@ function renderPeople(rows) {
         <td class="num">${fmt.format(person.qtyEach)}</td>
         <td class="num">${fmt.format(person.qtyPack)}</td>
         <td class="num">${fmt.format(person.waves)}</td>
+        <td class="num">${fmt.format(person.branchCount)}</td>
         <td class="num">
           <div class="rate-cell">
             <span class="rate-value ${rateClass}">${rate ? fmt1.format(rate) : "-"}</span>
@@ -1729,6 +1794,7 @@ function waveSummary(rows) {
       let pickEnd = null;
       let sortStart = null;
       let sortEnd = null;
+      const branches = new Set();
       for (const item of items) {
         if (item.pick.at) {
           if (!pickStart || item.pick.at < pickStart) pickStart = item.pick.at;
@@ -1738,6 +1804,7 @@ function waveSummary(rows) {
           if (!sortStart || item.sort.at < sortStart) sortStart = item.sort.at;
           if (!sortEnd || item.sort.at > sortEnd) sortEnd = item.sort.at;
         }
+        if (item.branch) branches.add(item.branch);
       }
       return {
         wave,
@@ -1747,6 +1814,7 @@ function waveSummary(rows) {
         pickDuration: minutesBetween(pickStart, pickEnd),
         sortDuration: minutesBetween(sortStart, sortEnd),
         avgCycle: mean(items.map((row) => row.cycleMinutes)),
+        branchCount: branches.size,
       };
     })
     .sort((a, b) => b.qtyEach - a.qtyEach || b.qtyPack - a.qtyPack);
@@ -1756,7 +1824,7 @@ function renderWaves(rows) {
   const waves = waveSummary(rows).slice(0, 18);
   $("#waveHint").textContent = `${fmt.format(uniqueCount(rows, (row) => row.wave))} waves`;
   if (!waves.length) {
-    $("#waveTable").innerHTML = `<tr><td colspan="7" class="empty">ไม่มีข้อมูล</td></tr>`;
+    $("#waveTable").innerHTML = `<tr><td colspan="8" class="empty">ไม่มีข้อมูล</td></tr>`;
     return;
   }
   const maxEach = Math.max(...waves.map(w => w.qtyEach), 1);
@@ -1783,6 +1851,7 @@ function renderWaves(rows) {
             <div class="pack-bar-wrap"><div class="pack-bar" style="width:${packPct}%"></div></div>
           </div>
         </td>
+        <td class="num">${wave.branchCount ? fmt.format(wave.branchCount) : "-"}</td>
         <td class="num">${metricMinutes(wave.pickDuration)}</td>
         <td class="num">${metricMinutes(wave.sortDuration)}</td>
         <td class="num"><span class="cycle-badge ${cycClass}">${metricMinutes(cyc)}</span></td>
@@ -1799,7 +1868,7 @@ function renderSlowRows(rows) {
     .slice(0, 24);
   $("#slowHint").textContent = `เรียงจาก ${label} ล่าสุด`;
   if (!sorted.length) {
-    $("#slowTable").innerHTML = `<tr><td colspan="11" class="empty">ไม่มีข้อมูล</td></tr>`;
+    $("#slowTable").innerHTML = `<tr><td colspan="12" class="empty">ไม่มีข้อมูล</td></tr>`;
     return;
   }
   $("#slowTable").innerHTML = sorted.map((row) => {
@@ -1814,6 +1883,7 @@ function renderSlowRows(rows) {
         <td><span class="tag tag-${shift?.group || 'unknown'}">${html(shift?.shortLabel || "-")}</span></td>
         <td><span class="date-cell">${html(rowDate(row) ? rowDate(row).slice(5).replace("-","/") : "-")}</span></td>
         <td class="item-cell">${html(row.item || "-")}</td>
+        <td><span class="tag tag-branch">${html(row.branch || "-")}</span></td>
         <td class="num"><strong>${fmt.format(row.qtyEach)}</strong></td>
         <td class="num">${fmt.format(row.qtyPack)}</td>
         <td>${displayWorkerCompact(row.picker)}</td>
@@ -1829,6 +1899,217 @@ function displayWorkerCompact(worker) {
   if (!worker || !worker.code) return '<span class="missing">-</span>';
   const label = workerDisplayName(worker);
   return `<span class="worker-compact"><strong>${html(label)}</strong> <small>${html(worker.code)}</small></span>`;
+}
+
+function renderBranchesView(rows) {
+  const mode = activeMode();
+  const branchRows = rows.filter((r) => r.branch);
+  const totalQtyEach = sumBy(rows, "qtyEach");
+  
+  const uniqueBranches = new Set(rows.map((r) => r.branch).filter(Boolean));
+  const totalBranchesCount = uniqueBranches.size;
+
+  const days = new Set(rows.map(rowDate).filter(Boolean));
+  const waves = new Set(rows.map((r) => r.wave).filter(Boolean));
+  
+  const avgBranchesPerDay = days.size ? totalBranchesCount / days.size : 0;
+  const avgBranchesPerWave = waves.size ? totalBranchesCount / waves.size : 0;
+
+  const branchStatsMap = new Map();
+  rows.forEach((row) => {
+    if (!row.branch) return;
+    if (!branchStatsMap.has(row.branch)) {
+      branchStatsMap.set(row.branch, { branch: row.branch, qtyEach: 0, qtyPack: 0, waves: new Set() });
+    }
+    const stat = branchStatsMap.get(row.branch);
+    stat.qtyEach += row.qtyEach || 0;
+    stat.qtyPack += row.qtyPack || 0;
+    if (row.wave) stat.waves.add(row.wave);
+  });
+  
+  const branchStatsList = [...branchStatsMap.values()]
+    .map(stat => ({ ...stat, waveCount: stat.waves.size }))
+    .sort((a, b) => b.qtyEach - a.qtyEach);
+
+  const topBranchObj = branchStatsList[0] || { branch: "-", qtyEach: 0 };
+
+  const kpiContainer = $("#branchKpiGrid");
+  if (kpiContainer) {
+    const kpis = [
+      {
+        color: "teal",
+        label: "สาขาทั้งหมด",
+        value: fmt.format(totalBranchesCount),
+        note: `จากทั้งหมด ${fmt.format(rows.length)} รายการ`,
+      },
+      {
+        color: "indigo",
+        label: "จำนวนสาขา / วัน",
+        value: `${fmt1.format(avgBranchesPerDay)} สาขา`,
+        note: `เฉลี่ยจากทั้งหมด ${fmt.format(days.size)} วัน`,
+      },
+      {
+        color: "amber",
+        label: "จำนวนสาขา / Wave",
+        value: `${fmt1.format(avgBranchesPerWave)} สาขา`,
+        note: `เฉลี่ยจากทั้งหมด ${fmt.format(waves.size)} Wave`,
+      },
+      {
+        color: "cyan",
+        label: "สาขาที่จ่ายงานมากสุด",
+        value: topBranchObj.branch,
+        note: `จ่ายไป ${fmt.format(topBranchObj.qtyEach)} ชิ้น (${fmt.format(topBranchObj.qtyPack || 0)} แพ็ค)`,
+      }
+    ];
+
+    kpiContainer.innerHTML = kpis
+      .map(
+        ({ color, label, value, note }) => `
+          <article class="kpi ${color}">
+            <span>${html(label)}</span>
+            <strong>${html(value)}</strong>
+            <small>${html(note)}</small>
+          </article>`
+      )
+      .join("");
+  }
+
+  const hint = $("#branchHint");
+  if (hint) hint.textContent = `${fmt.format(totalBranchesCount)} สาขาที่กำลังให้บริการ`;
+
+  const topBranchesTable = $("#topBranchesTable");
+  if (topBranchesTable) {
+    const displayList = branchStatsList.slice(0, 15);
+    if (!displayList.length) {
+      topBranchesTable.innerHTML = `<tr><td colspan="5" class="empty">ไม่มีข้อมูล</td></tr>`;
+    } else {
+      const maxQty = Math.max(...displayList.map(b => b.qtyEach), 1);
+      topBranchesTable.innerHTML = displayList
+        .map((b) => {
+          const pct = totalQtyEach ? (b.qtyEach / totalQtyEach) * 100 : 0;
+          const barPct = (b.qtyEach / maxQty) * 100;
+          return `
+            <tr>
+              <td><span class="tag tag-branch">${html(b.branch)}</span></td>
+              <td class="num">
+                <div class="pack-cell">
+                  <span>${fmt.format(b.qtyEach)}</span>
+                  <div class="pack-bar-wrap"><div class="pack-bar pack-bar-each" style="width:${barPct}%"></div></div>
+                </div>
+              </td>
+              <td class="num">${fmt.format(b.qtyPack)}</td>
+              <td class="num">${fmt.format(b.waveCount)}</td>
+              <td class="num">${fmt1.format(pct)}%</td>
+            </tr>`;
+        })
+        .join("");
+    }
+  }
+
+  const dailyBranchesTable = $("#dailyBranchesTable");
+  if (dailyBranchesTable) {
+    const groupsByDate = new Map();
+    rows.forEach((r) => {
+      const date = rowDate(r);
+      if (!date) return;
+      if (!groupsByDate.has(date)) groupsByDate.set(date, []);
+      groupsByDate.get(date).push(r);
+    });
+
+    const dates = [...groupsByDate.keys()].sort((a, b) => a.localeCompare(b));
+    if (!dates.length) {
+      dailyBranchesTable.innerHTML = `<tr><td colspan="4" class="empty">ไม่มีข้อมูล</td></tr>`;
+    } else {
+      dailyBranchesTable.innerHTML = dates
+        .map((date) => {
+          const items = groupsByDate.get(date) || [];
+          const dayBranches = new Set(items.filter((x) => roleShift(x)?.group === "day").map((x) => x.branch).filter(Boolean)).size;
+          const nightBranches = new Set(items.filter((x) => roleShift(x)?.group === "night").map((x) => x.branch).filter(Boolean)).size;
+          const totalBranches = new Set(items.map((x) => x.branch).filter(Boolean)).size;
+          return `
+            <tr>
+              <td>${html(date)}</td>
+              <td class="num">${dayBranches ? fmt.format(dayBranches) : "-"}</td>
+              <td class="num">${nightBranches ? fmt.format(nightBranches) : "-"}</td>
+              <td class="num"><strong>${totalBranches ? fmt.format(totalBranches) : "-"}</strong></td>
+            </tr>`;
+        })
+        .join("");
+    }
+  }
+
+  const slotBranchesTable = $("#slotBranchesTable");
+  if (slotBranchesTable) {
+    const slots = Array.from({ length: 24 }, (_, hour) => ({
+      key: `${hour}`.padStart(2, "0"),
+      label: `${hour}`.padStart(2, "0") + ":00",
+      branches: new Set(),
+    }));
+    const bySlot = new Map(slots.map((s) => [s.key, s]));
+    rows.forEach((row) => {
+      const time = roleTime(row, mode);
+      if (time?.slotKey && bySlot.has(time.slotKey) && row.branch) {
+        bySlot.get(time.slotKey).branches.add(row.branch);
+      }
+    });
+    const visibleSlots = slots.filter((s) => s.branches.size > 0);
+    const maxBranches = Math.max(...visibleSlots.map(s => s.branches.size), 1);
+
+    if (!visibleSlots.length) {
+      slotBranchesTable.innerHTML = `<tr><td colspan="3" class="empty">ไม่มีข้อมูล</td></tr>`;
+    } else {
+      slotBranchesTable.innerHTML = visibleSlots
+        .map((s) => {
+          const count = s.branches.size;
+          const pct = (count / maxBranches) * 100;
+          return `
+            <tr>
+              <td><span class="tag">${s.label}</span></td>
+              <td>
+                <div class="bar-track" style="margin: 0; width: 100%; min-width: 100px;">
+                  <div class="bar-pair">
+                    <div class="bar-pick" style="width:${pct}%"></div>
+                  </div>
+                </div>
+              </td>
+              <td class="num"><strong>${fmt.format(count)}</strong></td>
+            </tr>`;
+        })
+        .join("");
+    }
+  }
+
+  const waveBranchesTable = $("#waveBranchesTable");
+  if (waveBranchesTable) {
+    const wavesList = [...groupBy(rows, (r) => r.wave).entries()]
+      .map(([wave, items]) => {
+        const branches = new Set(items.map(r => r.branch).filter(Boolean));
+        return {
+          wave,
+          date: rowDate(items[0]),
+          qtyEach: sumBy(items, "qtyEach"),
+          qtyPack: sumBy(items, "qtyPack"),
+          branchCount: branches.size,
+        };
+      })
+      .sort((a, b) => b.qtyEach - a.qtyEach)
+      .slice(0, 15);
+
+    if (!wavesList.length) {
+      waveBranchesTable.innerHTML = `<tr><td colspan="5" class="empty">ไม่มีข้อมูล</td></tr>`;
+    } else {
+      waveBranchesTable.innerHTML = wavesList
+        .map((w) => `
+          <tr>
+            <td><span class="tag tag-wave">${html(w.wave)}</span></td>
+            <td><span class="date-cell">${html(w.date ? w.date.slice(5).replace("-","/") : "-")}</span></td>
+            <td class="num">${fmt.format(w.qtyEach)}</td>
+            <td class="num">${fmt.format(w.qtyPack)}</td>
+            <td class="num"><strong>${fmt.format(w.branchCount)}</strong></td>
+          </tr>`)
+        .join("");
+    }
+  }
 }
 
 function xmlEscape(value) {
@@ -2031,13 +2312,14 @@ function peopleExcelSheets(rows) {
     {
       name: `${roleLabel()} People`,
       rows: [
-        ["รหัส", "ชื่อจริง", "Qty ชิ้น", "Qty แพ็ค", "Wave", "Active hours", "ชิ้น/hr", "Avg Pick→Sort นาที"],
+        ["รหัส", "ชื่อจริง", "Qty ชิ้น", "Qty แพ็ค", "Wave", "จำนวนสาขา", "Active hours", "ชิ้น/hr", "Avg Pick→Sort นาที"],
         ...employeeSummary(rows, mode).map((person) => [
           person.worker.code,
           workerDisplayName(person.worker),
           person.qtyEach,
           person.qtyPack,
           person.waves,
+          person.branchCount,
           person.activeHours,
           person.rateEach || "",
           person.avgCycle || "",
@@ -2047,19 +2329,20 @@ function peopleExcelSheets(rows) {
     {
       name: `${roleLabel()} Slot`,
       rows: [
-        ["เวลา", "รายการ", "Qty ชิ้น", "Qty แพ็ค"],
-        ...slotSummary(rows, mode).map((slot) => [slot.label, slot.count, slot.qtyEach, slot.qtyPack]),
+        ["เวลา", "รายการ", "Qty ชิ้น", "Qty แพ็ค", "จำนวนสาขา"],
+        ...slotSummary(rows, mode).map((slot) => [slot.label, slot.count, slot.qtyEach, slot.qtyPack, slot.branchCount]),
       ],
     },
     {
       name: "Wave",
       rows: [
-        ["Wave", "วันที่", "Qty ชิ้น", "Qty แพ็ค", "เวลา Pick นาที", "เวลา Sort นาที", "Avg Pick→Sort นาที"],
+        ["Wave", "วันที่", "Qty ชิ้น", "Qty แพ็ค", "จำนวนสาขา", "เวลา Pick นาที", "เวลา Sort นาที", "Avg Pick→Sort นาที"],
         ...waveSummary(rows).map((wave) => [
           wave.wave,
           wave.date,
           wave.qtyEach,
           wave.qtyPack,
+          wave.branchCount,
           wave.pickDuration || "",
           wave.sortDuration || "",
           wave.avgCycle || "",
@@ -2076,7 +2359,7 @@ function worklistExcelSheets(rows) {
     {
       name: "Worklist",
       rows: [
-        ["Mode", "Wave", "วันที่", "กะ", "ช่วงเวลา", "Item", "Qty ชิ้น", "Qty แพ็ค", "Picker code", "Picker name", "Sorter code", "Sorter name", "Pick date", "Pick time", "Pick slot", "Sort date", "Sort time", "Sort slot", "Cycle นาที"],
+        ["Mode", "Wave", "วันที่", "กะ", "ช่วงเวลา", "Item", "สาขา", "Qty ชิ้น", "Qty แพ็ค", "Picker code", "Picker name", "Sorter code", "Sorter name", "Pick date", "Pick time", "Pick slot", "Sort date", "Sort time", "Sort slot", "Cycle นาที"],
         ...sorted.map((row) => {
           const shift = roleShift(row, mode);
           return [
@@ -2086,6 +2369,7 @@ function worklistExcelSheets(rows) {
             shift?.label || "",
             shift?.window || "",
             row.item,
+            row.branch || "",
             row.qtyEach,
             row.qtyPack,
             row.picker.code,
@@ -2106,6 +2390,44 @@ function worklistExcelSheets(rows) {
   ];
 }
 
+function branchesExcelSheets(rows) {
+  const topBranches = [...groupBy(rows, (r) => r.branch).entries()]
+    .map(([branch, items]) => ({
+      branch: branch || "ไม่ระบุ",
+      qtyEach: sumBy(items, "qtyEach"),
+      qtyPack: sumBy(items, "qtyPack"),
+      waves: uniqueCount(items, (row) => row.wave),
+    }))
+    .sort((a, b) => b.qtyEach - a.qtyEach);
+
+  const dailyGroups = groupBy(rows, rowDate);
+  const dailyDates = [...dailyGroups.keys()].sort((a, b) => a.localeCompare(b));
+  const dailyBranches = dailyDates.map((date) => {
+    const items = dailyGroups.get(date) || [];
+    const day = new Set(items.filter((x) => roleShift(x)?.group === "day").map((x) => x.branch).filter(Boolean)).size;
+    const night = new Set(items.filter((x) => roleShift(x)?.group === "night").map((x) => x.branch).filter(Boolean)).size;
+    const total = new Set(items.map((x) => x.branch).filter(Boolean)).size;
+    return [date, day, night, total];
+  });
+
+  return [
+    {
+      name: "Top Branches",
+      rows: [
+        ["รหัสสาขา", "Qty ชิ้น", "Qty แพ็ค", "จำนวน Wave"],
+        ...topBranches.map((b) => [b.branch, b.qtyEach, b.qtyPack, b.waves]),
+      ],
+    },
+    {
+      name: "Daily Branches",
+      rows: [
+        ["วันที่", "DAY (สาขา)", "NIGHT (สาขา)", "รวม (สาขา)"],
+        ...dailyBranches,
+      ],
+    },
+  ];
+}
+
 function exportCurrentMenuExcel() {
   const activeRows = filteredRecords();
   const menuRows = state.activeMenu === "daily" ? filteredDailyRecords() : activeRows;
@@ -2118,6 +2440,8 @@ function exportCurrentMenuExcel() {
     sheets.push(...dailyExcelSheets(menuRows));
   } else if (state.activeMenu === "people") {
     sheets.push(...peopleExcelSheets(activeRows));
+  } else if (state.activeMenu === "branches") {
+    sheets.push(...branchesExcelSheets(activeRows));
   } else if (state.activeMenu === "worklist") {
     sheets.push(...worklistExcelSheets(activeRows));
   } else {
@@ -2421,6 +2745,7 @@ function render() {
       const sortedRate   = items.length ? (sorted / items.length) * 100 : 0;
       const avgCycle     = mean(items.map((r) => r.cycleMinutes));
       const workers      = uniqueCount(items, (r) => roleWorker(r).code);
+      const branches     = new Set(items.map((r) => r.branch).filter(Boolean)).size;
       const pct          = total.qtyEach ? (totalQtyEach / total.qtyEach) * 100 : 0;
 
       // previous
@@ -2432,6 +2757,9 @@ function render() {
       const pAvgCycle     = pItems.length ? mean(pItems.map((r) => r.cycleMinutes)) : null;
       const pWorkers      = pItems.length
         ? uniqueCount(pItems, (r) => roleWorker(r).code)
+        : null;
+      const pBranches     = pItems.length
+        ? new Set(pItems.map((r) => r.branch).filter(Boolean)).size
         : null;
 
       const hasPrev = pItems.length > 0;
@@ -2470,6 +2798,12 @@ function render() {
               ${hasPrev && pAvgCycle !== null ? `<div class="shift-stat-prev">${fmt1.format(pAvgCycle)} นาที</div>` : ""}
             </div>
             <div class="shift-stat">
+              <div class="shift-stat-value">${fmt.format(branches)}</div>
+              <div class="shift-stat-label">สาขา</div>
+              ${hasPrev ? deltaHtml(branches, pBranches) : ""}
+              ${hasPrev ? `<div class="shift-stat-prev">${fmt.format(pBranches)} สาขา</div>` : ""}
+            </div>
+            <div class="shift-stat">
               <div class="shift-stat-value">${fmt.format(workers)}</div>
               <div class="shift-stat-label">คน</div>
               ${hasPrev ? deltaHtml(workers, pWorkers) : ""}
@@ -2484,6 +2818,7 @@ function render() {
   renderSlots(rows);
   renderWaves(rows);
   renderSlowRows(rows);
+  renderBranchesView(rows);
   renderQuality(rows);
   syncMenu();
   
@@ -2525,6 +2860,7 @@ function renderDailyDayNight(rows) {
       const unassignedPack = sumBy(unassignedItems, "qtyPack");
       const total = dayQty + nightQty + unassignedQty;
       const totalPack = dayPack + nightPack + unassignedPack;
+      const totalBranches = new Set(items.map((x) => x.branch).filter(Boolean)).size;
 
       totalDayEach += dayQty;
       totalNightEach += nightQty;
@@ -2539,6 +2875,7 @@ function renderDailyDayNight(rows) {
           <td class="num col-night">${qtyStack(nightQty, nightPack)}</td>
           <td class="num col-total">${qtyStack(total, totalPack)}</td>
           <td class="num">${html(note)}</td>
+          <td class="num">${totalBranches ? fmt.format(totalBranches) : "-"}</td>
         </tr>`;
     })
     .join("");
@@ -2546,13 +2883,14 @@ function renderDailyDayNight(rows) {
   const table = $("#dayNightByDateTable");
   if (!table) return;
   if (!lines) {
-    table.innerHTML = `<tr><td colspan="5" class="empty">ไม่มีข้อมูล</td></tr>`;
+    table.innerHTML = `<tr><td colspan="6" class="empty">ไม่มีข้อมูล</td></tr>`;
     return;
   }
 
   // Need to calculate grand total across all rows for the overall total column, to ensure it doesn't just sum day+night if there are hidden unassigned items
   const overallTotalEach = sumBy(rows, "qtyEach");
   const overallTotalPack = sumBy(rows, "qtyPack");
+  const overallTotalBranches = new Set(rows.map((x) => x.branch).filter(Boolean)).size;
   
   const footer = `
     <tr class="group-header">
@@ -2561,6 +2899,7 @@ function renderDailyDayNight(rows) {
       <td class="num col-night">${qtyStack(totalNightEach, totalNightPack)}</td>
       <td class="num col-total">${qtyStack(overallTotalEach, overallTotalPack)}</td>
       <td class="num"><strong>${fmt1.format((totalDayEach / (overallTotalEach || 1)) * 100)}% / ${fmt1.format((totalNightEach / (overallTotalEach || 1)) * 100)}%</strong></td>
+      <td class="num"><strong>${overallTotalBranches ? fmt.format(overallTotalBranches) : "-"}</strong></td>
     </tr>`;
 
   table.innerHTML = lines + footer;

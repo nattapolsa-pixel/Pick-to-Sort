@@ -114,6 +114,7 @@
                 <col class="num" />
                 <col class="num" />
                 <col class="num" />
+                <col class="num" />
               </colgroup>
               <thead>
                 <tr>
@@ -122,6 +123,7 @@
                   <th class="num col-night">🌙 NIGHT</th>
                   <th class="num col-total">รวม</th>
                   <th class="num col-note">DAY% / NIGHT%</th>
+                  <th class="num">สาขา</th>
                 </tr>
               </thead>
               <tbody id="dayNightByDateTable"></tbody>
@@ -151,6 +153,7 @@
                   <th class="num">ชิ้น</th>
                   <th class="num">แพ็ค</th>
                   <th class="num">Wave</th>
+                  <th class="num">สาขา</th>
                   <th class="num">ชิ้น/hr</th>
                   <th class="num">เวลาเฉลี่ย</th>
                 </tr>
@@ -161,24 +164,14 @@
         </section>
 
         <section class="grid-two align-start" data-menu-section="people">
-          <article class="panel">
+          <article class="panel slot-panel-v2">
             <div class="panel-head">
               <h2>⏲️ Slot เวลา</h2>
               <span id="slotHint"></span>
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>เวลา</th>
-                    <th>สัดส่วน</th>
-                    <th class="num">ชิ้น</th>
-                    <th class="num">แพ็ค</th>
-                  </tr>
-                </thead>
-                <tbody id="slotTable"></tbody>
-              </table>
-              <div id="slotLegend" class="legend" style="padding: 16px 24px; border-top: 1px solid rgba(255, 255, 255, 0.05);"></div>
+            <div class="slot-grid-wrap">
+              <div id="slotGrid" class="slot-grid"></div>
+              <div id="slotLegend" class="legend slot-legend-v2"></div>
             </div>
           </article>
 
@@ -195,6 +188,7 @@
                     <th>วันที่</th>
                     <th class="num">ชิ้น</th>
                     <th class="num">แพ็ค</th>
+                    <th class="num">สาขา</th>
                     <th class="num">เวลา Pick</th>
                     <th class="num">เวลา Sort</th>
                     <th class="num">เวลาเฉลี่ย</th>
@@ -219,6 +213,7 @@
                   <th>กะ</th>
                   <th>วันที่</th>
                   <th>Item</th>
+                  <th>สาขา</th>
                   <th class="num">ชิ้น</th>
                   <th class="num">แพ็ค</th>
                   <th>Picker</th>
@@ -232,6 +227,8 @@
             </table>
           </div>
         </section>
+
+
 
 
         </main>
