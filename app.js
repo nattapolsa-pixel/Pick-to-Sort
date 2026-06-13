@@ -106,11 +106,16 @@ function gvizUrl(callbackName, source = config) {
     headers: "0",
     _: String(Date.now()),
   });
-  if (source.range) params.set("range", source.range);
+  if (source.range) {
+    params.set("range", source.range);
+    if (source.range.startsWith("A:")) {
+      params.set("tq", "where A is not null");
+    }
+  }
   return `https://docs.google.com/spreadsheets/d/${source.sheetId}/gviz/tq?${params.toString()}`;
 }
 
-function loadSheetViaJsonp(source = config) {
+function loadSheetViaJsonp(source = config, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
     const callbackName = `__pickToSort_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
@@ -118,7 +123,7 @@ function loadSheetViaJsonp(source = config) {
     const timeoutId = window.setTimeout(() => {
       cleanup();
       reject(new Error("โหลดข้อมูลจาก Google Sheet ไม่สำเร็จในเวลาที่กำหนด"));
-    }, 45000);
+    }, timeoutMs);
 
     function cleanup() {
       if (done) return;
@@ -583,9 +588,21 @@ async function loadStaffLookup() {
   if (!source?.sheetId || !source.sheetName) {
     return { lookup: staffLookup, count: Object.keys(staffLookup).length };
   }
-  const payload = await loadSheetViaJsonp(source);
-  const lookup = buildStaffLookup(rowsFromGviz(payload));
-  return { lookup, count: Object.keys(lookup).length };
+  try {
+    // Attempt load with a short 4-second timeout.
+    // If it's private or redirected to Google Login, fail fast.
+    const payload = await loadSheetViaJsonp(source, 4000);
+    const lookup = buildStaffLookup(rowsFromGviz(payload));
+    return { lookup, count: Object.keys(lookup).length };
+  } catch (error) {
+    const fallbackCount = Object.keys(staffLookup).length;
+    return {
+      lookup: staffLookup,
+      count: fallbackCount,
+      error: error.message || "โหลดรายชื่อไม่สำเร็จ",
+      fallback: fallbackCount > 0,
+    };
+  }
 }
 
 function normalizeRecords(rawRows) {
@@ -2924,41 +2941,46 @@ async function loadData({ keepFilters = false } = {}) {
   setLoading(true);
   setStatus("กำลังโหลด", "loading");
   try {
-    const staffPromise = loadStaffLookup().catch((error) => {
-      const fallbackCount = Object.keys(staffLookup).length;
-      if (fallbackCount) {
-        console.info("ใช้รายชื่อสำรองจาก data.js เพราะโหลดชีตรายชื่อสดไม่ได้", error);
-      } else {
-        console.warn(error);
-      }
-      return {
-        lookup: staffLookup,
-        count: fallbackCount,
-        error: error.message || "โหลดรายชื่อไม่สำเร็จ",
-        fallback: fallbackCount > 0,
-      };
-    });
-    const [payload, loadedStaff] = await Promise.all([loadSheetViaJsonp(), staffPromise]);
-    staffLookup = loadedStaff.lookup || {};
-    staffMeta = {
-      loaded: !loadedStaff.error,
-      count: loadedStaff.count || Object.keys(staffLookup).length,
-      error: loadedStaff.error || "",
-      fallback: Boolean(loadedStaff.fallback),
-    };
+    // 1. Fetch the main data sheet first (public and fast)
+    const payload = await loadSheetViaJsonp();
+    
+    // 2. Parse main data immediately
     msCache.clear();
     const rawRows = rowsFromGviz(payload);
     const result = normalizeRecords(rawRows);
     records = result.records;
     sourceMeta = deriveMeta(records, result.skippedRows);
     syncDateControls(!keepFilters);
+    
+    // 3. Render the dashboard immediately using the static fallback staff list
     render();
     setStatus("", "");
+    setLoading(false); // Done loading main data!
+
+    // 4. Fetch the staff list asynchronously in the background
+    loadStaffLookup()
+      .then((loadedStaff) => {
+        staffLookup = loadedStaff.lookup || {};
+        staffMeta = {
+          loaded: !loadedStaff.error,
+          count: loadedStaff.count || Object.keys(staffLookup).length,
+          error: loadedStaff.error || "",
+          fallback: Boolean(loadedStaff.fallback),
+        };
+        // Re-render to show online staff names if successfully fetched
+        if (!loadedStaff.error) {
+          console.info(`โหลดรายชื่อพนักงานสำเร็จจากชีตสด: ${loadedStaff.count} คน`);
+          render();
+        }
+      })
+      .catch((error) => {
+        console.warn("ไม่สามารถโหลดรายชื่อพนักงานจาก Google Sheet ได้, ใช้รายชื่อสำรองแทน:", error);
+      });
+
   } catch (error) {
     console.error(error);
     setStatus(error.message || "โหลดข้อมูลไม่สำเร็จ", "error");
     render();
-  } finally {
     setLoading(false);
   }
 }
