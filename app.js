@@ -1135,6 +1135,11 @@ function renderKpis(rows, prevRows = []) {
     return `<div class="kpi-delta-row">${deltaHtml(cur, prev, lowerIsBetter)}<span class="kpi-prev-val">${typeof prev === "number" && prev % 1 !== 0 ? fmt1.format(prev) : fmt.format(prev)}</span></div>`;
   }
 
+  const productivityNote = (prod) => {
+    const basis = mode === "sort" ? " จาก Slot Sort" : "";
+    return `${fmt.format(prod.totalQtyEach)} ชิ้น / ${fmt1.format(prod.totalActiveHours)} ชม.${basis}`;
+  };
+
   const kpis = [
     {
       color: "indigo",
@@ -1175,21 +1180,21 @@ function renderKpis(rows, prevRows = []) {
       color: "cyan",
       label: `Productivity ${label}`,
       value: `${fmt1.format(totalProd.productivity)} ชิ้น/hr`,
-      note: `${fmt.format(totalProd.totalQtyEach)} ชิ้น / ${fmt1.format(totalProd.totalActiveHours)} ชม.`,
+      note: productivityNote(totalProd),
       delta: hasPrev && pTotalProd ? kpiDelta(totalProd.productivity, pTotalProd.productivity) : "",
     },
     ...(dayProd.totalQtyEach > 0 ? [{
       color: "amber",
       label: `${label} Productivity DAY`,
       value: `${fmt1.format(dayProd.productivity)} ชิ้น/hr`,
-      note: `${fmt.format(dayProd.totalQtyEach)} ชิ้น / ${fmt1.format(dayProd.totalActiveHours)} ชม.`,
+      note: productivityNote(dayProd),
       delta: hasPrev && pDayProd ? kpiDelta(dayProd.productivity, pDayProd.productivity) : "",
     }] : []),
     ...(nightProd.totalQtyEach > 0 ? [{
       color: "indigo",
       label: `${label} Productivity NIGHT`,
       value: `${fmt1.format(nightProd.productivity)} ชิ้น/hr`,
-      note: `${fmt.format(nightProd.totalQtyEach)} ชิ้น / ${fmt1.format(nightProd.totalActiveHours)} ชม.`,
+      note: productivityNote(nightProd),
       delta: hasPrev && pNightProd ? kpiDelta(nightProd.productivity, pNightProd.productivity) : "",
     }] : []),
     ...(branchTotal > 0 ? [{
@@ -1220,6 +1225,22 @@ function rowsForRole(rows, mode) {
   return rows.filter((row) => row[workerKey].code && row[timeKey].at);
 }
 
+function spanActiveMinutes(dayRows, timeKey) {
+  const times = dayRows.map((row) => toMs(row[timeKey].at)).filter(Boolean);
+  if (!times.length) return 0;
+  const span = (Math.max(...times) - Math.min(...times)) / 60000;
+  return Math.max(span, dayRows.length > 1 ? 10 : 5);
+}
+
+function roleActiveMinutes(dayRows, mode, timeKey) {
+  if (activeMode(mode) !== "sort") return spanActiveMinutes(dayRows, timeKey);
+
+  const activeSlots = new Set(dayRows.map((row) => row.sort?.slotKey).filter(Boolean));
+  if (activeSlots.size) return activeSlots.size * 60;
+
+  return spanActiveMinutes(dayRows, timeKey);
+}
+
 function calculateRoleProductivity(rows, mode) {
   const timeKey = mode === "pick" ? "pick" : "sort";
   const workerKey = mode === "pick" ? "picker" : "sorter";
@@ -1228,10 +1249,7 @@ function calculateRoleProductivity(rows, mode) {
 
   groupBy(roleRows, (row) => row[workerKey].code).forEach((workerRows) => {
     groupBy(workerRows, (row) => rowDate(row, mode)).forEach((dayRows) => {
-      const times = dayRows.map((row) => toMs(row[timeKey].at)).filter(Boolean);
-      if (!times.length) return;
-      const span = (Math.max(...times) - Math.min(...times)) / 60000;
-      activeMinutes += Math.max(span, dayRows.length > 1 ? 10 : 5);
+      activeMinutes += roleActiveMinutes(dayRows, mode, timeKey);
     });
   });
 
@@ -1244,6 +1262,7 @@ function calculateRoleProductivity(rows, mode) {
     qtyEach,
     totalQtyEach: qtyEach,
     rows: roleRows,
+    basisLabel: activeMode(mode) === "sort" ? "Slot Sort" : "เวลาแรก-สุดท้าย",
   };
 }
 
