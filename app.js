@@ -1097,8 +1097,8 @@ function renderKpis(rows, prevRows = []) {
   const label = roleLabel(mode);
   const roleRows = rowsForRole(rows, mode);
   const prevRoleRows = rowsForRole(prevRows, mode);
-  const qtyRows = rowsForRole(rows, "pick");
-  const prevQtyRows = rowsForRole(prevRows, "pick");
+  const qtyRows = roleRows;
+  const prevQtyRows = prevRoleRows;
   const cycles = rows.map((row) => row.cycleMinutes).filter((value) => value !== null);
   const sorted = rows.filter((row) => row.sort.at).length;
   const avgCycle = mean(cycles);
@@ -1118,8 +1118,8 @@ function renderKpis(rows, prevRows = []) {
 
   // branch counts (total / day / night)
   const branchAll  = new Set(qtyRows.map(r => r.branch).filter(Boolean));
-  const branchDay  = new Set(qtyRows.filter(r => filterShift(r)?.group === "day").map(r => r.branch).filter(Boolean));
-  const branchNight = new Set(qtyRows.filter(r => filterShift(r)?.group === "night").map(r => r.branch).filter(Boolean));
+  const branchDay  = new Set(qtyRows.filter(r => roleShift(r, mode)?.group === "day").map(r => r.branch).filter(Boolean));
+  const branchNight = new Set(qtyRows.filter(r => roleShift(r, mode)?.group === "night").map(r => r.branch).filter(Boolean));
   const branchTotal = branchAll.size;
   const branchDayCount = branchDay.size;
   const branchNightCount = branchNight.size;
@@ -1138,8 +1138,8 @@ function renderKpis(rows, prevRows = []) {
   const pDayProd       = hasPrev ? calculateRoleProductivityByShift(prevRows, mode, "day") : null;
   const pNightProd     = hasPrev ? calculateRoleProductivityByShift(prevRows, mode, "night") : null;
   const pBranchTotal   = hasPrev ? new Set(prevQtyRows.map(r => r.branch).filter(Boolean)).size : null;
-  const pBranchDay     = hasPrev ? new Set(prevQtyRows.filter(r => filterShift(r)?.group === "day").map(r => r.branch).filter(Boolean)).size : null;
-  const pBranchNight   = hasPrev ? new Set(prevQtyRows.filter(r => filterShift(r)?.group === "night").map(r => r.branch).filter(Boolean)).size : null;
+  const pBranchDay     = hasPrev ? new Set(prevQtyRows.filter(r => roleShift(r, mode)?.group === "day").map(r => r.branch).filter(Boolean)).size : null;
+  const pBranchNight   = hasPrev ? new Set(prevQtyRows.filter(r => roleShift(r, mode)?.group === "night").map(r => r.branch).filter(Boolean)).size : null;
 
   function kpiDelta(cur, prev, lowerIsBetter = false) {
     if (!hasPrev || prev === null || prev === undefined) return "";
@@ -1156,21 +1156,21 @@ function renderKpis(rows, prevRows = []) {
       color: "indigo",
       label: `${label} Qty ชิ้น`,
       value: fmt.format(totalQtyEach),
-      note: mode === "sort" ? `${fmt.format(items)} items · ฐาน Pick` : `${fmt.format(items)} items`,
+      note: `${fmt.format(items)} items`,
       delta: kpiDelta(totalQtyEach, pTotalQtyEach),
     },
     {
       color: "amber",
       label: `${label} Qty แพ็ค`,
       value: fmt.format(totalQtyPack),
-      note: mode === "sort" ? "AO / UOM Qty · ฐาน Pick" : "AO / UOM Qty",
+      note: "AO / UOM Qty",
       delta: kpiDelta(totalQtyPack, pTotalQtyPack),
     },
     {
       color: "cyan",
       label: mode === "sort" ? "Sort รายการ" : "Sort สำเร็จ",
       value: mode === "sort" ? fmt.format(roleRows.length) : `${fmt1.format(sortedRate)}%`,
-      note: mode === "sort" ? "จากชุด Pick ที่กรอง" : `${fmt.format(sorted)} รายการ`,
+      note: mode === "sort" ? "รายการ Sort ที่มีเวลา Sort" : `${fmt.format(sorted)} รายการ`,
       delta: mode === "sort" ? kpiDelta(roleRows.length, prevRoleRows.length) : kpiDelta(sortedRate, pSortedRate),
     },
     {
@@ -2642,7 +2642,7 @@ function exportInfoRows(rowCount) {
 function overviewExcelSheets(rows, prevRows) {
   const mode = activeMode();
   const roleRows = rowsForRole(rows, mode);
-  const qtyRows = rowsForRole(rows, "pick");
+  const qtyRows = roleRows;
   const prod = calculateRoleProductivity(rows, mode);
   const sorted = roleRows.filter((row) => row.sort.at).length;
   const sortRate = roleRows.length ? (sorted / roleRows.length) * 100 : 0;
@@ -2651,8 +2651,7 @@ function overviewExcelSheets(rows, prevRows) {
     ["Mode", roleLabel()],
     ["Qty ชิ้น", sumBy(qtyRows, "qtyEach")],
     ["Qty แพ็ค", sumBy(qtyRows, "qtyPack")],
-    ["รายการฐาน Pick", qtyRows.length],
-    ["รายการตาม Mode", roleRows.length],
+    [`รายการ ${roleLabel()}`, qtyRows.length],
     ["คน", uniqueCount(roleRows, (row) => roleWorker(row, mode).code)],
     ["Items", uniqueCount(qtyRows, (row) => row.item)],
     ["Waves", uniqueCount(qtyRows, (row) => row.wave)],
@@ -2664,7 +2663,7 @@ function overviewExcelSheets(rows, prevRows) {
   const dayNightRows = [
     ["Shift", "Qty ชิ้น", "Qty แพ็ค", "รายการ", "คน", "Sort รายการ", "Sort %", "Avg Pick→Sort นาที"],
     ...["day", "night", "transition"].map((group) => {
-      const items = rows.filter((row) => filterShift(row)?.group === group);
+      const items = roleRows.filter((row) => roleShift(row, mode)?.group === group);
       const sortedCount = items.filter((row) => row.sort.at).length;
       return [
         group,
