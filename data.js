@@ -2,7 +2,7 @@ window.PICK_SORT_CONFIG = {
   sheetId: "1Rd1KWLNZPIgSFfOnM1sCLjMmGhtRFuIXfHFPYjfg74o",
   gid: "377885389",
   sheetName: "Data",
-  range: "A:Q",
+  range: "A:S",
   timeShiftHours: 0,
   rawTimeShiftHours: -7,
   autoRefreshMs: 300000,

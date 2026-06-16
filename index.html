@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="logo.png" />
-    <link rel="stylesheet" href="styles.css?v=32" />
+    <link rel="stylesheet" href="styles.css?v=34" />
   </head>
   <body>
     <div class="app-shell">
@@ -39,7 +39,7 @@
         </label>
         <label class="search-box">
           <span>🔍 ค้นหา</span>
-          <input id="searchInput" type="search" placeholder="Wave, Item, รหัส, ชื่อจริง" />
+          <input id="searchInput" type="search" placeholder="Wave, Item, รหัสสินค้า, ชื่อสินค้า, ชื่อจริง" />
         </label>
             <label class="shift-box">
           <span>⏱️ กะ</span>
@@ -77,6 +77,7 @@
           <button data-menu-tab="daily" type="button">รายวัน / เวลา</button>
           <button data-menu-tab="people" type="button">พนักงาน / Wave</button>
           <button data-menu-tab="employeeSlots" type="button">คน / เวลา</button>
+          <button data-menu-tab="products" type="button">รายการสินค้า</button>
           <button data-menu-tab="worklist" type="button">รายการ</button>
 
         </nav>
@@ -92,7 +93,7 @@
           <div id="dayNightCards" class="shift-summary-cards"></div>
         </section>
 
-        <section class="panel pending-sort-panel" data-menu-section="overview">
+        <section class="panel pending-sort-panel" data-menu-section="overview" data-role-panel="pick">
           <div class="panel-head">
             <h2>⏳ คงเหลือยังไม่ได้ Sort</h2>
             <span id="pendingSortHint"></span>
@@ -161,8 +162,8 @@
                   <th class="num">แพ็ค</th>
                   <th class="num">Wave</th>
                   <th class="num">สาขา</th>
-                  <th class="num">ชิ้น/hr</th>
-                  <th class="num">เวลาเฉลี่ย</th>
+                  <th class="num">เวลารวม</th>
+                  <th class="num">เฉลี่ย/รายการ</th>
                 </tr>
               </thead>
               <tbody id="peopleTable"></tbody>
@@ -211,6 +212,8 @@
                     <th class="num">ชิ้น</th>
                     <th class="num">แพ็ค</th>
                     <th class="num">รายการ</th>
+                    <th class="num">เวลางาน</th>
+                    <th class="num">เฉลี่ย/รายการ</th>
                     <th class="num">สาขา</th>
                   </tr>
                 </thead>
@@ -233,6 +236,8 @@
                     <th class="num">ชิ้น</th>
                     <th class="num">แพ็ค</th>
                     <th class="num">รายการ</th>
+                    <th class="num">เวลางาน</th>
+                    <th class="num">เฉลี่ย/รายการ</th>
                     <th class="num">สาขา</th>
                   </tr>
                 </thead>
@@ -244,7 +249,7 @@
 
         <section class="panel employee-slot-panel" data-menu-section="employeeSlots" style="margin-top: 16px;">
           <div class="panel-head">
-            <h2>📋 รายละเอียดรวม Pick / Sort</h2>
+            <h2>📋 รายละเอียดคน / เวลา</h2>
             <span id="employeeSlotHint"></span>
           </div>
           <div class="table-wrap employee-slot-wrap">
@@ -255,17 +260,80 @@
                   <th>รหัส</th>
                   <th>ชื่อจริง</th>
                   <th class="num">วัน</th>
-                  <th class="num">Pick ชิ้น</th>
-                  <th class="num">Pick แพ็ค</th>
-                  <th class="num">Pick รายการ</th>
-                  <th class="num">Sort ชิ้น</th>
-                  <th class="num">Sort แพ็ค</th>
-                  <th class="num">Sort รายการ</th>
+                  <th class="num">ชิ้น</th>
+                  <th class="num">แพ็ค</th>
+                  <th class="num">รายการ</th>
+                  <th class="num">เวลางาน</th>
+                  <th class="num">เฉลี่ย/รายการ</th>
                   <th class="num">สาขา</th>
-                  <th class="num">รวมชิ้น</th>
+                  <th class="num">สัดส่วน</th>
                 </tr>
               </thead>
               <tbody id="employeeSlotTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel" data-menu-section="products" style="margin-bottom: 16px;">
+          <div class="panel-head">
+            <h2>รายการสินค้า</h2>
+            <span id="productOverviewHint"></span>
+          </div>
+          <div id="productKpis" class="insight-grid"></div>
+        </section>
+
+        <section class="panel product-panel" data-menu-section="products" style="margin-bottom: 16px;">
+          <div class="panel-head">
+            <h2>สรุปตามสินค้า</h2>
+            <span id="productTableHint"></span>
+          </div>
+          <div class="table-wrap product-table-wrap">
+            <table class="product-table">
+              <thead>
+                <tr>
+                  <th>รหัสสินค้า</th>
+                  <th>ชื่อสินค้า</th>
+                  <th class="num">ชิ้น</th>
+                  <th class="num">แพ็ค</th>
+                  <th class="num">รายการ</th>
+                  <th class="num">Wave</th>
+                  <th class="num">สาขา</th>
+                  <th class="num">คน</th>
+                  <th class="num">เวลารวม</th>
+                  <th class="num">เฉลี่ย/รายการ</th>
+                  <th class="num">เฉลี่ย/1 Wave</th>
+                  <th class="num">ชิ้น/ชม.</th>
+                </tr>
+              </thead>
+              <tbody id="productTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel product-panel" data-menu-section="products" style="margin-bottom: 16px;">
+          <div class="panel-head">
+            <h2>สินค้า x Wave</h2>
+            <span id="productWaveHint"></span>
+          </div>
+          <div class="table-wrap product-table-wrap">
+            <table class="product-wave-table">
+              <thead>
+                <tr>
+                  <th>Wave</th>
+                  <th>วันที่</th>
+                  <th>รหัสสินค้า</th>
+                  <th>ชื่อสินค้า</th>
+                  <th class="num">ชิ้น</th>
+                  <th class="num">แพ็ค</th>
+                  <th class="num">รายการ</th>
+                  <th class="num">สาขา</th>
+                  <th class="num">คน</th>
+                  <th class="num">เวลางาน</th>
+                  <th class="num">เฉลี่ย/รายการ</th>
+                  <th class="num">ชิ้น/ชม.</th>
+                </tr>
+              </thead>
+              <tbody id="productWaveTable"></tbody>
             </table>
           </div>
         </section>
@@ -296,9 +364,8 @@
                     <th class="num">ชิ้น</th>
                     <th class="num">แพ็ค</th>
                     <th class="num">สาขา</th>
-                    <th class="num">เวลา Pick</th>
-                    <th class="num">เวลา Sort</th>
-                    <th class="num">เวลาเฉลี่ย</th>
+                    <th class="num">เวลางาน</th>
+                    <th class="num">เฉลี่ย/รายการ</th>
                   </tr>
                 </thead>
                 <tbody id="waveTable"></tbody>
@@ -323,11 +390,8 @@
                   <th>สาขา</th>
                   <th class="num">ชิ้น</th>
                   <th class="num">แพ็ค</th>
-                  <th>Picker</th>
-                  <th>Sorter</th>
-                  <th>Pick</th>
-                  <th>Sort</th>
-                  <th class="num">เวลา</th>
+                  <th>พนักงาน</th>
+                  <th>เวลา</th>
                 </tr>
               </thead>
               <tbody id="slowTable"></tbody>
@@ -343,6 +407,6 @@
     </div>
 
     <script src="data.js?v=10"></script>
-    <script src="app.js?v=53"></script>
+    <script src="app.js?v=57"></script>
   </body>
 </html>

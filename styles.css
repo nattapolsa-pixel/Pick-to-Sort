@@ -1723,7 +1723,7 @@ tr.group-header {
 }
 
 .employee-slot-table {
-  min-width: 1180px;
+  min-width: 1320px;
 }
 
 .employee-slot-time {
@@ -1786,6 +1786,48 @@ tr.group-header {
   min-width: 2px;
   border-radius: inherit;
   background: linear-gradient(90deg, #14b8a6, #60a5fa);
+}
+
+/* Product tables */
+.product-panel {
+  overflow: hidden;
+}
+
+.product-table-wrap {
+  max-height: 560px;
+}
+
+.product-table {
+  min-width: 1320px;
+}
+
+.product-wave-table {
+  min-width: 1280px;
+}
+
+.product-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 260px;
+  max-width: 440px;
+}
+
+.product-name-cell.compact {
+  min-width: 220px;
+  max-width: 360px;
+}
+
+.product-name-cell strong {
+  color: #e2e8f0;
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.product-name-cell small {
+  color: #64748b;
+  font-size: 11px;
 }
 
 .employee-heatmap-panel {
