@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="logo.png" />
-    <link rel="stylesheet" href="styles.css?v=27" />
+    <link rel="stylesheet" href="styles.css?v=32" />
   </head>
   <body>
     <div class="app-shell">
@@ -47,13 +47,13 @@
             <option value="all">ทั้งหมด</option>
             <optgroup label="DAY">
               <option value="day">DAY รวม OT</option>
-              <option value="day_normal">DAY 08:00-17:00</option>
-              <option value="day_ot">OT DAY 17:30-20:00</option>
+              <option value="day_normal">DAY 07:00-16:00</option>
+              <option value="day_ot">OT DAY 16:30-19:00</option>
             </optgroup>
             <optgroup label="NIGHT">
               <option value="night">NIGHT รวม OT</option>
-              <option value="night_normal">NIGHT 20:00-05:00</option>
-              <option value="night_ot">OT NIGHT 05:30-08:00</option>
+              <option value="night_normal">NIGHT 19:00-04:00</option>
+              <option value="night_ot">OT NIGHT 04:30-07:00</option>
             </optgroup>
             <option value="transition">พัก/เปลี่ยนกะ</option>
           </select>
@@ -76,6 +76,7 @@
           <button class="active" data-menu-tab="overview" type="button">ภาพรวม</button>
           <button data-menu-tab="daily" type="button">รายวัน / เวลา</button>
           <button data-menu-tab="people" type="button">พนักงาน / Wave</button>
+          <button data-menu-tab="employeeSlots" type="button">คน / เวลา</button>
           <button data-menu-tab="worklist" type="button">รายการ</button>
 
         </nav>
@@ -99,9 +100,15 @@
           <div id="pendingSortContent" class="pending-sort-content"></div>
         </section>
 
+        <section class="panel shift-summary-panel daily-shift-panel" data-menu-section="daily">
+          <div class="panel-head">
+            <h2>🧭 สรุปกะ / เวลา</h2>
+            <span id="dailyShiftHint"></span>
+          </div>
+          <div id="dailyShiftCards" class="shift-summary-cards daily-shift-cards"></div>
+        </section>
 
-
-        <section class="panel" data-menu-section="daily">
+        <section class="panel" data-menu-section="daily" style="margin-top: 16px;">
           <div class="panel-head">
             <h2>📅 สรุปรายวัน (แยก DAY / NIGHT)</h2>
             <span id="dayNightByDateHint"></span>
@@ -159,6 +166,106 @@
                 </tr>
               </thead>
               <tbody id="peopleTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel" data-menu-section="employeeSlots" style="margin-bottom: 16px;">
+          <div class="panel-head">
+            <h2>🧭 ภาพรวมคน / เวลา</h2>
+            <span id="employeeSlotOverviewHint"></span>
+          </div>
+          <div id="employeeSlotKpis" class="insight-grid"></div>
+        </section>
+
+        <section class="grid-two align-start role-filtered-grid" data-menu-section="employeeSlots">
+          <article class="panel employee-heatmap-panel" data-role-panel="pick">
+            <div class="panel-head">
+              <h2>👆 Pick คน x ชั่วโมง</h2>
+              <span id="pickHeatmapHint"></span>
+            </div>
+            <div id="pickHeatmap" class="employee-heatmap"></div>
+          </article>
+
+          <article class="panel employee-heatmap-panel" data-role-panel="sort">
+            <div class="panel-head">
+              <h2>📮 Sort คน x ชั่วโมง</h2>
+              <span id="sortHeatmapHint"></span>
+            </div>
+            <div id="sortHeatmap" class="employee-heatmap"></div>
+          </article>
+        </section>
+
+        <section class="grid-two align-start role-filtered-grid" data-menu-section="employeeSlots" style="margin-top: 16px;">
+          <article class="panel" data-role-panel="pick">
+            <div class="panel-head">
+              <h2>👆 Pick รายชั่วโมง</h2>
+              <span id="pickSlotEmployeeHint"></span>
+            </div>
+            <div class="table-wrap role-slot-employee-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Slot</th>
+                    <th>พนักงาน</th>
+                    <th class="num">ชิ้น</th>
+                    <th class="num">แพ็ค</th>
+                    <th class="num">รายการ</th>
+                    <th class="num">สาขา</th>
+                  </tr>
+                </thead>
+                <tbody id="pickSlotEmployeeTable"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel" data-role-panel="sort">
+            <div class="panel-head">
+              <h2>📮 Sort รายชั่วโมง</h2>
+              <span id="sortSlotEmployeeHint"></span>
+            </div>
+            <div class="table-wrap role-slot-employee-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Slot</th>
+                    <th>พนักงาน</th>
+                    <th class="num">ชิ้น</th>
+                    <th class="num">แพ็ค</th>
+                    <th class="num">รายการ</th>
+                    <th class="num">สาขา</th>
+                  </tr>
+                </thead>
+                <tbody id="sortSlotEmployeeTable"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel employee-slot-panel" data-menu-section="employeeSlots" style="margin-top: 16px;">
+          <div class="panel-head">
+            <h2>📋 รายละเอียดรวม Pick / Sort</h2>
+            <span id="employeeSlotHint"></span>
+          </div>
+          <div class="table-wrap employee-slot-wrap">
+            <table class="employee-slot-table">
+              <thead>
+                <tr>
+                  <th>Slot</th>
+                  <th>รหัส</th>
+                  <th>ชื่อจริง</th>
+                  <th class="num">วัน</th>
+                  <th class="num">Pick ชิ้น</th>
+                  <th class="num">Pick แพ็ค</th>
+                  <th class="num">Pick รายการ</th>
+                  <th class="num">Sort ชิ้น</th>
+                  <th class="num">Sort แพ็ค</th>
+                  <th class="num">Sort รายการ</th>
+                  <th class="num">สาขา</th>
+                  <th class="num">รวมชิ้น</th>
+                </tr>
+              </thead>
+              <tbody id="employeeSlotTable"></tbody>
             </table>
           </div>
         </section>
@@ -236,6 +343,6 @@
     </div>
 
     <script src="data.js?v=10"></script>
-    <script src="app.js?v=45"></script>
+    <script src="app.js?v=52"></script>
   </body>
 </html>

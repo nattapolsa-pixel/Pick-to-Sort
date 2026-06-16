@@ -80,20 +80,20 @@ const STAFF_COLUMN_CANDIDATES = {
 const SHIFT_FILTERS = {
   all: "ทั้งหมด",
   day: "DAY รวม OT",
-  day_normal: "DAY 08:00-17:00",
-  day_ot: "OT DAY 17:30-20:00",
+  day_normal: "DAY 07:00-16:00",
+  day_ot: "OT DAY 16:30-19:00",
   night: "NIGHT รวม OT",
-  night_normal: "NIGHT 20:00-05:00",
-  night_ot: "OT NIGHT 05:30-08:00",
+  night_normal: "NIGHT 19:00-04:00",
+  night_ot: "OT NIGHT 04:30-07:00",
   transition: "พัก/เปลี่ยนกะ",
 };
 
 const SHIFT_SUMMARY_ROWS = [
-  { key: "day_normal", label: "DAY", window: "08:00-17:00", group: "day" },
-  { key: "day_ot", label: "OT DAY", window: "17:30-20:00", group: "day" },
-  { key: "night_normal", label: "NIGHT", window: "20:00-05:00", group: "night" },
-  { key: "night_ot", label: "OT NIGHT", window: "05:30-08:00", group: "night" },
-  { key: "transition", label: "พัก/เปลี่ยนกะ", window: "17:00-17:30 / 05:00-05:30", group: "transition" },
+  { key: "day_normal", label: "DAY", window: "07:00-16:00", group: "day" },
+  { key: "day_ot", label: "OT DAY", window: "16:30-19:00", group: "day" },
+  { key: "night_normal", label: "NIGHT", window: "19:00-04:00", group: "night" },
+  { key: "night_ot", label: "OT NIGHT", window: "04:30-07:00", group: "night" },
+  { key: "transition", label: "พัก/เปลี่ยนกะ", window: "16:00-16:30 / 04:00-04:30", group: "transition" },
 ];
 
 const msCache = new Map();
@@ -499,34 +499,34 @@ function shiftInfo(workTime, sourceShift = "") {
   const total = hour * 60 + minute;
   const date = workTime.date;
 
-  if (total >= 480 && total <= 1020) {
-    return { key: "day_normal", group: "day", label: "DAY", shortLabel: "DAY", window: "08:00-17:00", date, isOt: false };
+  if (total >= 420 && total <= 960) {
+    return { key: "day_normal", group: "day", label: "DAY", shortLabel: "DAY", window: "07:00-16:00", date, isOt: false };
   }
-  if (total >= 1050 && total < 1200) {
-    return { key: "day_ot", group: "day", label: "OT DAY", shortLabel: "OT DAY", window: "17:30-20:00", date, isOt: true };
+  if (total >= 990 && total < 1140) {
+    return { key: "day_ot", group: "day", label: "OT DAY", shortLabel: "OT DAY", window: "16:30-19:00", date, isOt: true };
   }
-  if (total >= 1200 || total <= 300) {
+  if (total >= 1140 || total <= 240) {
     return {
       key: "night_normal",
       group: "night",
       label: "NIGHT",
       shortLabel: "NIGHT",
-      window: "20:00-05:00",
-      date: total <= 300 ? previousDate(date) : date,
+      window: "19:00-04:00",
+      date: total <= 240 ? previousDate(date) : date,
       isOt: false,
     };
   }
-  if (total >= 330 && total < 480) {
-    return { key: "night_ot", group: "night", label: "OT NIGHT", shortLabel: "OT NIGHT", window: "05:30-08:00", date: previousDate(date), isOt: true };
+  if (total >= 270 && total < 420) {
+    return { key: "night_ot", group: "night", label: "OT NIGHT", shortLabel: "OT NIGHT", window: "04:30-07:00", date: previousDate(date), isOt: true };
   }
 
-  const isMorningTransition = total > 300 && total < 330;
+  const isMorningTransition = total > 240 && total < 270;
   return {
     key: "transition",
     group: "transition",
     label: "พัก/เปลี่ยนกะ",
     shortLabel: "พัก",
-    window: isMorningTransition ? "05:00-05:30" : "17:00-17:30",
+    window: isMorningTransition ? "04:00-04:30" : "16:00-16:30",
     date: isMorningTransition ? previousDate(date) : date,
     isOt: false,
   };
@@ -790,6 +790,15 @@ function roleShift(record, mode = state.peopleMode) {
   return record.pickShift || record.shift;
 }
 
+function filterShift(record) {
+  return record.pickShift || record.shift || record.sortShift;
+}
+
+function filterDate(record) {
+  if (record.pick?.date) return record.pick.date;
+  return filterShift(record)?.date || record.sort?.date || "";
+}
+
 function rowDate(record, mode = state.peopleMode) {
   const time = roleTime(record, mode);
   if (time?.date) return time.date;
@@ -866,7 +875,7 @@ function searchText(record) {
 }
 
 function shiftMatches(record, filterValue) {
-  const shift = roleShift(record);
+  const shift = filterShift(record);
   if (!filterValue || filterValue === "all") return true;
   if (filterValue === "day" || filterValue === "night") return shift?.group === filterValue;
   if (filterValue === "transition") return shift?.group === "transition";
@@ -876,7 +885,7 @@ function shiftMatches(record, filterValue) {
 function filteredRecords({ ignoreShift = false } = {}) {
   const term = state.search.trim().toLowerCase();
   return records.filter((record) => {
-    const date = rowDate(record);
+    const date = filterDate(record);
     if ((state.dateFrom || state.dateTo) && !date) return false;
     if (state.dateFrom && date && date < state.dateFrom) return false;
     if (state.dateTo && date && date > state.dateTo) return false;
@@ -1088,15 +1097,17 @@ function renderKpis(rows, prevRows = []) {
   const label = roleLabel(mode);
   const roleRows = rowsForRole(rows, mode);
   const prevRoleRows = rowsForRole(prevRows, mode);
+  const qtyRows = rowsForRole(rows, "pick");
+  const prevQtyRows = rowsForRole(prevRows, "pick");
   const cycles = rows.map((row) => row.cycleMinutes).filter((value) => value !== null);
   const sorted = rows.filter((row) => row.sort.at).length;
   const avgCycle = mean(cycles);
-  const items = uniqueCount(roleRows, (row) => row.item);
-  const waveCount = uniqueCount(roleRows, (row) => row.wave);
+  const items = uniqueCount(qtyRows, (row) => row.item);
+  const waveCount = uniqueCount(qtyRows, (row) => row.wave);
   const sortedRate = roleRows.length ? (sorted / roleRows.length) * 100 : 0;
 
-  const totalQtyEach = sumBy(roleRows, "qtyEach");
-  const totalQtyPack = sumBy(roleRows, "qtyPack");
+  const totalQtyEach = sumBy(qtyRows, "qtyEach");
+  const totalQtyPack = sumBy(qtyRows, "qtyPack");
   const notCountedRows = rows.filter((row) => row.countedQty === false);
   const notCountedQtyEach = sumBy(notCountedRows, "rawQtyEach");
   const notCountedQtyPack = sumBy(notCountedRows, "rawQtyPack");
@@ -1106,9 +1117,9 @@ function renderKpis(rows, prevRows = []) {
   const workerCount = uniqueCount(roleRows, (row) => roleWorker(row, mode).code);
 
   // branch counts (total / day / night)
-  const branchAll  = new Set(roleRows.map(r => r.branch).filter(Boolean));
-  const branchDay  = new Set(roleRows.filter(r => roleShift(r, mode)?.group === "day").map(r => r.branch).filter(Boolean));
-  const branchNight = new Set(roleRows.filter(r => roleShift(r, mode)?.group === "night").map(r => r.branch).filter(Boolean));
+  const branchAll  = new Set(qtyRows.map(r => r.branch).filter(Boolean));
+  const branchDay  = new Set(qtyRows.filter(r => filterShift(r)?.group === "day").map(r => r.branch).filter(Boolean));
+  const branchNight = new Set(qtyRows.filter(r => filterShift(r)?.group === "night").map(r => r.branch).filter(Boolean));
   const branchTotal = branchAll.size;
   const branchDayCount = branchDay.size;
   const branchNightCount = branchNight.size;
@@ -1117,18 +1128,18 @@ function renderKpis(rows, prevRows = []) {
   const hasPrev = prevRows.length > 0;
   const pCycles = prevRows.map((r) => r.cycleMinutes).filter((v) => v !== null);
   const pSorted = prevRoleRows.filter((r) => r.sort.at).length;
-  const pTotalQtyEach  = hasPrev ? sumBy(prevRoleRows, "qtyEach") : null;
-  const pTotalQtyPack  = hasPrev ? sumBy(prevRoleRows, "qtyPack") : null;
+  const pTotalQtyEach  = hasPrev ? sumBy(prevQtyRows, "qtyEach") : null;
+  const pTotalQtyPack  = hasPrev ? sumBy(prevQtyRows, "qtyPack") : null;
   const pSortedRate    = hasPrev && prevRoleRows.length ? (pSorted / prevRoleRows.length) * 100 : null;
   const pAvgCycle      = hasPrev ? mean(pCycles) : null;
   const pWorkers       = hasPrev ? uniqueCount(prevRoleRows, (r) => roleWorker(r, mode).code) : null;
-  const pWaveCount     = hasPrev ? uniqueCount(prevRoleRows, (r) => r.wave) : null;
+  const pWaveCount     = hasPrev ? uniqueCount(prevQtyRows, (r) => r.wave) : null;
   const pTotalProd     = hasPrev ? calculateRoleProductivity(prevRows, mode) : null;
   const pDayProd       = hasPrev ? calculateRoleProductivityByShift(prevRows, mode, "day") : null;
   const pNightProd     = hasPrev ? calculateRoleProductivityByShift(prevRows, mode, "night") : null;
-  const pBranchTotal   = hasPrev ? new Set(prevRoleRows.map(r => r.branch).filter(Boolean)).size : null;
-  const pBranchDay     = hasPrev ? new Set(prevRoleRows.filter(r => roleShift(r, mode)?.group === "day").map(r => r.branch).filter(Boolean)).size : null;
-  const pBranchNight   = hasPrev ? new Set(prevRoleRows.filter(r => roleShift(r, mode)?.group === "night").map(r => r.branch).filter(Boolean)).size : null;
+  const pBranchTotal   = hasPrev ? new Set(prevQtyRows.map(r => r.branch).filter(Boolean)).size : null;
+  const pBranchDay     = hasPrev ? new Set(prevQtyRows.filter(r => filterShift(r)?.group === "day").map(r => r.branch).filter(Boolean)).size : null;
+  const pBranchNight   = hasPrev ? new Set(prevQtyRows.filter(r => filterShift(r)?.group === "night").map(r => r.branch).filter(Boolean)).size : null;
 
   function kpiDelta(cur, prev, lowerIsBetter = false) {
     if (!hasPrev || prev === null || prev === undefined) return "";
@@ -1145,21 +1156,21 @@ function renderKpis(rows, prevRows = []) {
       color: "indigo",
       label: `${label} Qty ชิ้น`,
       value: fmt.format(totalQtyEach),
-      note: `${fmt.format(items)} items`,
+      note: mode === "sort" ? `${fmt.format(items)} items · ฐาน Pick` : `${fmt.format(items)} items`,
       delta: kpiDelta(totalQtyEach, pTotalQtyEach),
     },
     {
       color: "amber",
       label: `${label} Qty แพ็ค`,
       value: fmt.format(totalQtyPack),
-      note: "AO / UOM Qty",
+      note: mode === "sort" ? "AO / UOM Qty · ฐาน Pick" : "AO / UOM Qty",
       delta: kpiDelta(totalQtyPack, pTotalQtyPack),
     },
     {
       color: "cyan",
       label: mode === "sort" ? "Sort รายการ" : "Sort สำเร็จ",
       value: mode === "sort" ? fmt.format(roleRows.length) : `${fmt1.format(sortedRate)}%`,
-      note: mode === "sort" ? "ตาม Sort Date" : `${fmt.format(sorted)} รายการ`,
+      note: mode === "sort" ? "จากชุด Pick ที่กรอง" : `${fmt.format(sorted)} รายการ`,
       delta: mode === "sort" ? kpiDelta(roleRows.length, prevRoleRows.length) : kpiDelta(sortedRate, pSortedRate),
     },
     {
@@ -1271,6 +1282,57 @@ function calculateRoleProductivityByShift(rows, mode, shiftGroup) {
     rows.filter((row) => roleShift(row, mode)?.group === shiftGroup),
     mode
   );
+}
+
+function dailyShiftSummary(rows, mode = state.peopleMode) {
+  const definitions = [
+    {
+      group: "day",
+      label: "กะเช้า",
+      shortLabel: "DAY",
+      emoji: "☀️",
+      colorClass: "shift-day",
+      window: "07:00-16:00",
+      otWindow: "16:30-19:00",
+    },
+    {
+      group: "night",
+      label: "กะดึก",
+      shortLabel: "NIGHT",
+      emoji: "🌙",
+      colorClass: "shift-night",
+      window: "19:00-04:00",
+      otWindow: "04:30-07:00",
+    },
+  ];
+
+  return definitions.map((definition) => {
+    const groupRows = rowsForRole(
+      rows.filter((row) => roleShift(row, mode)?.group === definition.group),
+      mode
+    );
+    const otRows = groupRows.filter((row) => roleShift(row, mode)?.isOt);
+    const prod = calculateRoleProductivity(groupRows, mode);
+    const otProd = calculateRoleProductivity(otRows, mode);
+    const branches = new Set(groupRows.map((row) => row.branch).filter(Boolean));
+
+    return {
+      ...definition,
+      rows: groupRows,
+      rowCount: groupRows.length,
+      qtyEach: sumBy(groupRows, "qtyEach"),
+      qtyPack: sumBy(groupRows, "qtyPack"),
+      workers: uniqueCount(groupRows, (row) => roleWorker(row, mode).code),
+      branches: branches.size,
+      totalHours: prod.totalActiveHours,
+      otHours: otProd.totalActiveHours,
+      productivity: prod.productivity,
+    };
+  });
+}
+
+function hourStat(value) {
+  return value > 0 ? `${fmt1.format(value)}<span class="shift-stat-unit">ชม.</span>` : "–";
 }
 
 function roleStat(label, value, note = "") {
@@ -1536,7 +1598,7 @@ function renderShiftSummary(rows) {
 }
 
 function dailySummary(rows) {
-  return [...groupBy(rows, rowDate).entries()]
+  return [...groupBy(rows, filterDate).entries()]
     .map(([date, items]) => ({
       date,
       qtyPack: sumBy(items, "qtyPack"),
@@ -1757,6 +1819,121 @@ function slotSummary(rows, mode = state.peopleMode) {
   }));
 }
 
+function employeeSlotSummary(rows) {
+  const byWorkerSlot = new Map();
+
+  function ensureEntry(worker, time) {
+    const slotKey = time.slotKey;
+    const key = `${slotKey}|${worker.code}`;
+    if (!byWorkerSlot.has(key)) {
+      byWorkerSlot.set(key, {
+        slotKey,
+        slotLabel: `${slotKey}:00`,
+        worker,
+        days: new Set(),
+        branches: new Set(),
+        pickBranches: new Set(),
+        sortBranches: new Set(),
+        pickRows: 0,
+        pickQtyEach: 0,
+        pickQtyPack: 0,
+        sortRows: 0,
+        sortQtyEach: 0,
+        sortQtyPack: 0,
+      });
+    }
+    return byWorkerSlot.get(key);
+  }
+
+  rows.forEach((row) => {
+    if (row.picker.code && row.pick?.slotKey) {
+      const entry = ensureEntry(row.picker, row.pick);
+      entry.pickRows += 1;
+      entry.pickQtyEach += row.qtyEach || 0;
+      entry.pickQtyPack += row.qtyPack || 0;
+      if (row.pick.date) entry.days.add(row.pick.date);
+      if (row.branch) {
+        entry.branches.add(row.branch);
+        entry.pickBranches.add(row.branch);
+      }
+    }
+
+    if (row.sorter.code && row.sort?.slotKey) {
+      const entry = ensureEntry(row.sorter, row.sort);
+      entry.sortRows += 1;
+      entry.sortQtyEach += row.qtyEach || 0;
+      entry.sortQtyPack += row.qtyPack || 0;
+      if (row.sort.date) entry.days.add(row.sort.date);
+      if (row.branch) {
+        entry.branches.add(row.branch);
+        entry.sortBranches.add(row.branch);
+      }
+    }
+  });
+
+  return [...byWorkerSlot.values()]
+    .map((entry) => ({
+      ...entry,
+      dayCount: entry.days.size,
+      branchCount: entry.branches.size,
+      pickBranchCount: entry.pickBranches.size,
+      sortBranchCount: entry.sortBranches.size,
+      totalQtyEach: entry.pickQtyEach + entry.sortQtyEach,
+      totalRows: entry.pickRows + entry.sortRows,
+    }))
+    .sort((a, b) => a.slotKey.localeCompare(b.slotKey) || b.totalQtyEach - a.totalQtyEach || workerDisplayName(a.worker).localeCompare(workerDisplayName(b.worker)));
+}
+
+function roleEmployeeSlotSummary(rows, mode) {
+  const workerKey = mode === "pick" ? "picker" : "sorter";
+  const timeKey = mode === "pick" ? "pick" : "sort";
+  const entries = new Map();
+
+  rowsForRole(rows, mode).forEach((row) => {
+    const worker = row[workerKey];
+    const time = row[timeKey];
+    if (!worker.code || !time?.slotKey) return;
+    const key = `${time.slotKey}|${worker.code}`;
+    if (!entries.has(key)) {
+      entries.set(key, {
+        slotKey: time.slotKey,
+        slotLabel: `${time.slotKey}:00`,
+        worker,
+        days: new Set(),
+        branches: new Set(),
+        qtyEach: 0,
+        qtyPack: 0,
+        rowCount: 0,
+      });
+    }
+    const entry = entries.get(key);
+    entry.qtyEach += row.qtyEach || 0;
+    entry.qtyPack += row.qtyPack || 0;
+    entry.rowCount += 1;
+    if (time.date) entry.days.add(time.date);
+    if (row.branch) entry.branches.add(row.branch);
+  });
+
+  return [...entries.values()]
+    .map((entry) => ({
+      ...entry,
+      dayCount: entry.days.size,
+      branchCount: entry.branches.size,
+    }))
+    .sort((a, b) => a.slotKey.localeCompare(b.slotKey) || b.qtyEach - a.qtyEach || workerDisplayName(a.worker).localeCompare(workerDisplayName(b.worker)));
+}
+
+function peakSlotLabel(entries) {
+  const slots = new Map();
+  entries.forEach((entry) => {
+    const current = slots.get(entry.slotKey) || { slotLabel: entry.slotLabel, qtyEach: 0 };
+    current.qtyEach += entry.qtyEach;
+    slots.set(entry.slotKey, current);
+  });
+  const peak = [...slots.values()].sort((a, b) => b.qtyEach - a.qtyEach)[0];
+  return peak ? `${peak.slotLabel} · ${fmt.format(peak.qtyEach)} ชิ้น` : "-";
+}
+
 function employeeSummary(rows, mode) {
   const workerKey = mode === "pick" ? "picker" : "sorter";
   const timeKey = mode === "pick" ? "pick" : "sort";
@@ -1768,10 +1945,7 @@ function employeeSummary(rows, mode) {
       const days = groupBy(items, (row) => rowDate(row, mode));
       let activeMinutes = 0;
       days.forEach((dayRows) => {
-        const times = dayRows.map((row) => toMs(row[timeKey].at)).filter(Boolean);
-        if (!times.length) return;
-        const span = (Math.max(...times) - Math.min(...times)) / 60000;
-        activeMinutes += Math.max(span, dayRows.length > 1 ? 10 : 5);
+        activeMinutes += roleActiveMinutes(dayRows, mode, timeKey);
       });
       const activeHours = activeMinutes / 60;
       const qtyEach = sumBy(items, "qtyEach");
@@ -1830,6 +2004,212 @@ function renderPeople(rows) {
         <td class="num">${metricMinutes(person.avgCycle)}</td>
       </tr>`;
   }).join("");
+}
+
+function renderEmployeeSlots(rows) {
+  const table = $("#employeeSlotTable");
+  if (!table) return;
+
+  const summary = employeeSlotSummary(rows);
+  const totalPick = summary.reduce((sum, entry) => sum + entry.pickQtyEach, 0);
+  const totalSort = summary.reduce((sum, entry) => sum + entry.sortQtyEach, 0);
+  const hint = $("#employeeSlotHint");
+  if (hint) {
+    hint.textContent = `${fmt.format(summary.length)} แถวคน/ชั่วโมง · Pick ${fmt.format(totalPick)} ชิ้น · Sort ${fmt.format(totalSort)} ชิ้น · ตาม filter ปัจจุบัน`;
+  }
+
+  if (!summary.length) {
+    table.innerHTML = `<tr><td colspan="12" class="empty">ไม่มีข้อมูล</td></tr>`;
+    return;
+  }
+
+  const maxTotal = Math.max(...summary.map((entry) => entry.totalQtyEach), 1);
+  table.innerHTML = summary
+    .map((entry) => {
+      const totalPct = (entry.totalQtyEach / maxTotal) * 100;
+      const name = workerDisplayName(entry.worker);
+      return `
+        <tr>
+          <td><span class="slot-time-badge employee-slot-time">${html(entry.slotLabel)}</span></td>
+          <td><span class="tag">${html(entry.worker.code || "-")}</span></td>
+          <td>
+            <div class="employee-slot-worker">
+              <strong>${html(name)}</strong>
+              <small>${html(entry.worker.role || entry.worker.zone || "")}</small>
+            </div>
+          </td>
+          <td class="num">${entry.dayCount ? fmt.format(entry.dayCount) : "-"}</td>
+          <td class="num pick-num">${entry.pickQtyEach ? fmt.format(entry.pickQtyEach) : "-"}</td>
+          <td class="num pick-num">${entry.pickQtyPack ? fmt.format(entry.pickQtyPack) : "-"}</td>
+          <td class="num pick-num">${entry.pickRows ? fmt.format(entry.pickRows) : "-"}</td>
+          <td class="num sort-num">${entry.sortQtyEach ? fmt.format(entry.sortQtyEach) : "-"}</td>
+          <td class="num sort-num">${entry.sortQtyPack ? fmt.format(entry.sortQtyPack) : "-"}</td>
+          <td class="num sort-num">${entry.sortRows ? fmt.format(entry.sortRows) : "-"}</td>
+          <td class="num">${entry.branchCount ? fmt.format(entry.branchCount) : "-"}</td>
+          <td class="num">
+            <div class="employee-slot-total">
+              <strong>${fmt.format(entry.totalQtyEach)}</strong>
+              <span><i style="width:${totalPct}%"></i></span>
+            </div>
+          </td>
+        </tr>`;
+    })
+    .join("");
+}
+
+function renderEmployeeSlotOverview(rows) {
+  const grid = $("#employeeSlotKpis");
+  if (!grid) return;
+
+  const combined = employeeSlotSummary(rows);
+  const pickEntries = roleEmployeeSlotSummary(rows, "pick");
+  const sortEntries = roleEmployeeSlotSummary(rows, "sort");
+  const workers = new Set(combined.map((entry) => entry.worker.code).filter(Boolean));
+  const slots = new Set(combined.map((entry) => entry.slotKey).filter(Boolean));
+  const pickQty = pickEntries.reduce((sum, entry) => sum + entry.qtyEach, 0);
+  const sortQty = sortEntries.reduce((sum, entry) => sum + entry.qtyEach, 0);
+
+  const hint = $("#employeeSlotOverviewHint");
+  if (hint) hint.textContent = `${fmt.format(workers.size)} คน · ${fmt.format(slots.size)} slot · ตาม filter ปัจจุบัน`;
+
+  const cards = [
+    ["cyan", "คนที่มีงาน", fmt.format(workers.size), `${fmt.format(combined.length)} แถวคน/ชั่วโมง`],
+    ["green", "Pick รวม", fmt.format(pickQty), `${fmt.format(pickEntries.length)} แถว Pick/Slot`],
+    ["amber", "Sort รวม", fmt.format(sortQty), `${fmt.format(sortEntries.length)} แถว Sort/Slot`],
+    ["rose", "Peak Slot", peakSlotLabel([...pickEntries, ...sortEntries]), "ชั่วโมงที่มีชิ้นมากสุด"],
+  ];
+
+  grid.innerHTML = cards
+    .map(([tone, label, value, note]) => `
+      <article class="insight-card ${tone}">
+        <span>${html(label)}</span>
+        <strong>${html(value)}</strong>
+        <small>${html(note)}</small>
+      </article>`)
+    .join("");
+}
+
+function renderEmployeeHeatmap(rows, mode) {
+  const container = $(`#${mode}Heatmap`);
+  const hint = $(`#${mode}HeatmapHint`);
+  if (!container) return;
+
+  const entries = roleEmployeeSlotSummary(rows, mode);
+  const label = roleLabel(mode);
+  if (hint) hint.textContent = `${label} · Top 14 คนตามยอดชิ้น`;
+  if (!entries.length) {
+    container.innerHTML = `<div class="slot-empty">ไม่มีข้อมูล</div>`;
+    return;
+  }
+
+  const activeSlots = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+  const byWorker = new Map();
+  entries.forEach((entry) => {
+    const key = entry.worker.code;
+    if (!byWorker.has(key)) {
+      byWorker.set(key, {
+        worker: entry.worker,
+        qtyBySlot: new Map(),
+        totalQty: 0,
+        rowCount: 0,
+      });
+    }
+    const worker = byWorker.get(key);
+    worker.qtyBySlot.set(entry.slotKey, (worker.qtyBySlot.get(entry.slotKey) || 0) + entry.qtyEach);
+    worker.totalQty += entry.qtyEach;
+    worker.rowCount += entry.rowCount;
+  });
+
+  const workers = [...byWorker.values()]
+    .sort((a, b) => b.totalQty - a.totalQty || workerDisplayName(a.worker).localeCompare(workerDisplayName(b.worker)))
+    .slice(0, 14);
+  const maxCell = Math.max(...workers.flatMap((worker) => activeSlots.map((slot) => worker.qtyBySlot.get(slot) || 0)), 1);
+  const toneClass = mode === "pick" ? "heatmap-pick" : "heatmap-sort";
+
+  container.innerHTML = `
+    <div class="heatmap-scroll">
+      <table class="employee-hour-table ${toneClass}">
+        <thead>
+          <tr>
+            <th class="employee-hour-person-head">พนักงาน</th>
+            ${activeSlots.map((slot) => `<th class="employee-hour-slot">${slot}:00</th>`).join("")}
+            <th class="employee-hour-total-head">รวม</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${workers.map((worker) => `
+            <tr>
+              <th class="employee-hour-person">
+                <strong>${html(workerDisplayName(worker.worker))}</strong>
+                <small>${html(worker.worker.code || "-")} · ${fmt.format(worker.rowCount)} รายการ</small>
+              </th>
+              ${activeSlots.map((slot) => {
+                const qty = worker.qtyBySlot.get(slot) || 0;
+                const intensity = qty ? 0.16 + (qty / maxCell) * 0.84 : 0;
+                return `<td class="employee-hour-cell" style="--heat:${intensity}" title="${html(workerDisplayName(worker.worker))} ${slot}:00 · ${fmt.format(qty)} ชิ้น">${qty ? fmt.format(qty) : ""}</td>`;
+              }).join("")}
+              <td class="employee-hour-total">${fmt.format(worker.totalQty)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderRoleSlotEmployeeTable(rows, mode) {
+  const table = $(`#${mode}SlotEmployeeTable`);
+  const hint = $(`#${mode}SlotEmployeeHint`);
+  if (!table) return;
+
+  const entries = roleEmployeeSlotSummary(rows, mode);
+  const label = roleLabel(mode);
+  if (hint) hint.textContent = `${label} · Top 5 คนต่อ slot`;
+  if (!entries.length) {
+    table.innerHTML = `<tr><td colspan="6" class="empty">ไม่มีข้อมูล</td></tr>`;
+    return;
+  }
+
+  const bySlot = groupBy(entries, (entry) => entry.slotKey);
+  const rowsToShow = [];
+  [...bySlot.keys()].sort((a, b) => a.localeCompare(b)).forEach((slotKey) => {
+    const slotRows = (bySlot.get(slotKey) || []).sort((a, b) => b.qtyEach - a.qtyEach).slice(0, 5);
+    slotRows.forEach((entry, index) => rowsToShow.push({ ...entry, slotRank: index + 1 }));
+  });
+
+  const maxQty = Math.max(...rowsToShow.map((entry) => entry.qtyEach), 1);
+  table.innerHTML = rowsToShow
+    .map((entry) => {
+      const pct = (entry.qtyEach / maxQty) * 100;
+      return `
+        <tr>
+          <td><span class="slot-time-badge employee-slot-time">${html(entry.slotLabel)}</span></td>
+          <td>
+            <div class="employee-slot-worker">
+              <strong>#${entry.slotRank} ${html(workerDisplayName(entry.worker))}</strong>
+              <small>${html(entry.worker.code || "-")}</small>
+            </div>
+          </td>
+          <td class="num">
+            <div class="employee-slot-total">
+              <strong>${fmt.format(entry.qtyEach)}</strong>
+              <span><i style="width:${pct}%"></i></span>
+            </div>
+          </td>
+          <td class="num">${entry.qtyPack ? fmt.format(entry.qtyPack) : "-"}</td>
+          <td class="num">${fmt.format(entry.rowCount)}</td>
+          <td class="num">${entry.branchCount ? fmt.format(entry.branchCount) : "-"}</td>
+        </tr>`;
+    })
+    .join("");
+}
+
+function renderEmployeeSlotDashboard(rows) {
+  renderEmployeeSlotOverview(rows);
+  renderEmployeeHeatmap(rows, "pick");
+  renderEmployeeHeatmap(rows, "sort");
+  renderRoleSlotEmployeeTable(rows, "pick");
+  renderRoleSlotEmployeeTable(rows, "sort");
+  renderEmployeeSlots(rows);
 }
 
 function waveSummary(rows) {
@@ -2239,6 +2619,7 @@ function menuLabel(menu = state.activeMenu) {
     overview: "ภาพรวม",
     daily: "รายวัน",
     people: "พนักงาน-Wave",
+    employeeSlots: "คน-เวลา",
     worklist: "รายการ",
   }[menu] || menu;
 }
@@ -2261,18 +2642,20 @@ function exportInfoRows(rowCount) {
 function overviewExcelSheets(rows, prevRows) {
   const mode = activeMode();
   const roleRows = rowsForRole(rows, mode);
+  const qtyRows = rowsForRole(rows, "pick");
   const prod = calculateRoleProductivity(rows, mode);
   const sorted = roleRows.filter((row) => row.sort.at).length;
   const sortRate = roleRows.length ? (sorted / roleRows.length) * 100 : 0;
   const summaryRows = [
     ["Metric", "Value"],
     ["Mode", roleLabel()],
-    ["Qty ชิ้น", sumBy(roleRows, "qtyEach")],
-    ["Qty แพ็ค", sumBy(roleRows, "qtyPack")],
-    ["รายการ", roleRows.length],
+    ["Qty ชิ้น", sumBy(qtyRows, "qtyEach")],
+    ["Qty แพ็ค", sumBy(qtyRows, "qtyPack")],
+    ["รายการฐาน Pick", qtyRows.length],
+    ["รายการตาม Mode", roleRows.length],
     ["คน", uniqueCount(roleRows, (row) => roleWorker(row, mode).code)],
-    ["Items", uniqueCount(roleRows, (row) => row.item)],
-    ["Waves", uniqueCount(roleRows, (row) => row.wave)],
+    ["Items", uniqueCount(qtyRows, (row) => row.item)],
+    ["Waves", uniqueCount(qtyRows, (row) => row.wave)],
     ["Sort สำเร็จ %", sortRate],
     ["Productivity ชิ้น/hr", prod.productivity],
     ["Active hours", prod.totalActiveHours],
@@ -2281,7 +2664,7 @@ function overviewExcelSheets(rows, prevRows) {
   const dayNightRows = [
     ["Shift", "Qty ชิ้น", "Qty แพ็ค", "รายการ", "คน", "Sort รายการ", "Sort %", "Avg Pick→Sort นาที"],
     ...["day", "night", "transition"].map((group) => {
-      const items = rows.filter((row) => roleShift(row, mode)?.group === group);
+      const items = rows.filter((row) => filterShift(row)?.group === group);
       const sortedCount = items.filter((row) => row.sort.at).length;
       return [
         group,
@@ -2311,15 +2694,15 @@ function overviewExcelSheets(rows, prevRows) {
 }
 
 function dailyDayNightRows(rows) {
-  const groupsByDate = groupBy(rows, rowDate);
+  const groupsByDate = groupBy(rows, filterDate);
   const dates = [...groupsByDate.keys()].sort((a, b) => a.localeCompare(b));
   return [
     ["วันที่", "DAY ชิ้น", "DAY แพ็ค", "NIGHT ชิ้น", "NIGHT แพ็ค", "อื่นๆ ชิ้น", "อื่นๆ แพ็ค", "รวมชิ้น", "รวมแพ็ค", "DAY %", "NIGHT %"],
     ...dates.map((date) => {
       const items = groupsByDate.get(date) || [];
-      const day = items.filter((row) => roleShift(row)?.group === "day");
-      const night = items.filter((row) => roleShift(row)?.group === "night");
-      const other = items.filter((row) => !["day", "night"].includes(roleShift(row)?.group || ""));
+      const day = items.filter((row) => filterShift(row)?.group === "day");
+      const night = items.filter((row) => filterShift(row)?.group === "night");
+      const other = items.filter((row) => !["day", "night"].includes(filterShift(row)?.group || ""));
       const totalEach = sumBy(items, "qtyEach");
       return [
         date,
@@ -2338,8 +2721,28 @@ function dailyDayNightRows(rows) {
   ];
 }
 
+function dailyShiftSummaryRows(rows) {
+  return [
+    ["กะ", "ช่วงเวลาปกติ", "ช่วงเวลา OT", "Qty ชิ้น", "Qty แพ็ค", "รายการ", "คน", "สาขา", "เวลารวม ชั่วโมง", "OT ชั่วโมง", "Productivity ชิ้น/hr"],
+    ...dailyShiftSummary(rows, activeMode()).map((summary) => [
+      `${summary.label} ${summary.shortLabel}`,
+      summary.window,
+      summary.otWindow,
+      summary.qtyEach,
+      summary.qtyPack,
+      summary.rowCount,
+      summary.workers,
+      summary.branches,
+      summary.totalHours,
+      summary.otHours,
+      summary.productivity || "",
+    ]),
+  ];
+}
+
 function dailyExcelSheets(rows) {
   return [
+    { name: "Shift Summary", rows: dailyShiftSummaryRows(rows) },
     { name: "Day Night", rows: dailyDayNightRows(rows) },
     {
       name: "Daily Trend",
@@ -2348,6 +2751,67 @@ function dailyExcelSheets(rows) {
         ...dailySummary(rows).map((day) => [day.date, day.qtyEach, day.qtyPack, day.avgCycle || ""]),
       ],
     },
+  ];
+}
+
+function employeeSlotExcelRows(rows) {
+  return [
+    ["Slot", "รหัส", "ชื่อจริง", "จำนวนวัน", "Pick ชิ้น", "Pick แพ็ค", "Pick รายการ", "Pick สาขา", "Sort ชิ้น", "Sort แพ็ค", "Sort รายการ", "Sort สาขา", "สาขารวม", "รวมชิ้น", "รวมรายการ"],
+    ...employeeSlotSummary(rows).map((entry) => [
+      entry.slotLabel,
+      entry.worker.code,
+      workerDisplayName(entry.worker),
+      entry.dayCount,
+      entry.pickQtyEach,
+      entry.pickQtyPack,
+      entry.pickRows,
+      entry.pickBranchCount,
+      entry.sortQtyEach,
+      entry.sortQtyPack,
+      entry.sortRows,
+      entry.sortBranchCount,
+      entry.branchCount,
+      entry.totalQtyEach,
+      entry.totalRows,
+    ]),
+  ];
+}
+
+function roleEmployeeSlotExcelRows(rows, mode) {
+  return [
+    ["Slot", "รหัส", "ชื่อจริง", "Qty ชิ้น", "Qty แพ็ค", "รายการ", "จำนวนวัน", "จำนวนสาขา"],
+    ...roleEmployeeSlotSummary(rows, mode).map((entry) => [
+      entry.slotLabel,
+      entry.worker.code,
+      workerDisplayName(entry.worker),
+      entry.qtyEach,
+      entry.qtyPack,
+      entry.rowCount,
+      entry.dayCount,
+      entry.branchCount,
+    ]),
+  ];
+}
+
+function employeeSlotExcelSheets(rows) {
+  const pickEntries = roleEmployeeSlotSummary(rows, "pick");
+  const sortEntries = roleEmployeeSlotSummary(rows, "sort");
+  const combined = employeeSlotSummary(rows);
+  const summaryRows = [
+    ["Metric", "Value"],
+    ["คนที่มีงาน", new Set(combined.map((entry) => entry.worker.code).filter(Boolean)).size],
+    ["Slot ที่มีงาน", new Set(combined.map((entry) => entry.slotKey).filter(Boolean)).size],
+    ["Pick Qty ชิ้น", pickEntries.reduce((sum, entry) => sum + entry.qtyEach, 0)],
+    ["Sort Qty ชิ้น", sortEntries.reduce((sum, entry) => sum + entry.qtyEach, 0)],
+    ["Peak Pick Slot", peakSlotLabel(pickEntries)],
+    ["Peak Sort Slot", peakSlotLabel(sortEntries)],
+  ];
+
+  return [
+    { name: "Summary", rows: summaryRows },
+    { name: "Pick Slot People", rows: roleEmployeeSlotExcelRows(rows, "pick") },
+    { name: "Sort Slot People", rows: roleEmployeeSlotExcelRows(rows, "sort") },
+    { name: "Detail Pick Sort", rows: employeeSlotExcelRows(rows) },
   ];
 }
 
@@ -2485,6 +2949,8 @@ function exportCurrentMenuExcel() {
     sheets.push(...dailyExcelSheets(menuRows));
   } else if (state.activeMenu === "people") {
     sheets.push(...peopleExcelSheets(activeRows));
+  } else if (state.activeMenu === "employeeSlots") {
+    sheets.push(...employeeSlotExcelSheets(activeRows));
   } else if (state.activeMenu === "branches") {
     sheets.push(...branchesExcelSheets(activeRows));
   } else if (state.activeMenu === "worklist") {
@@ -2599,7 +3065,7 @@ function previousPeriodRecords() {
   const prevTo   = shiftDateStr(to,   -spanDays);
   const term = state.search.trim().toLowerCase();
   return records.filter((record) => {
-    const date = rowDate(record);
+    const date = filterDate(record);
     if (!date) return false;
     if (date < prevFrom || date > prevTo) return false;
     if (term && !searchText(record).includes(term)) return false;
@@ -2612,7 +3078,7 @@ function filteredDailyRecords() {
   if (!month) return filteredRecords(); // fallback
   const term = state.search.trim().toLowerCase();
   return records.filter((record) => {
-    const date = rowDate(record);
+    const date = filterDate(record);
     if (!date || !date.startsWith(month)) return false;
     if (term && !searchText(record).includes(term)) return false;
     if (!shiftMatches(record, state.shiftFilter)) return false;
@@ -2761,6 +3227,7 @@ function render() {
   renderDayNightSummary(shiftRows, prevShiftRows);
   renderPendingSort(rows);
   renderPickSortView(rows);
+  renderDailyShiftOverview(dailyRows);
   renderDailyChart(dailyRows);
 
   function renderDayNightSummary(rows, prevRows) {
@@ -2783,7 +3250,7 @@ function render() {
 
     container.innerHTML = groups.map((g) => {
       // current
-      const items        = rows.filter((r) => roleShift(r)?.group === g.key);
+      const items        = rows.filter((r) => filterShift(r)?.group === g.key);
       const totalQtyEach = sumBy(items, "qtyEach");
       const totalQtyPack = sumBy(items, "qtyPack");
       const sorted       = items.filter((r) => r.sort?.at).length;
@@ -2794,7 +3261,7 @@ function render() {
       const pct          = total.qtyEach ? (totalQtyEach / total.qtyEach) * 100 : 0;
 
       // previous
-      const pItems        = prevRows.filter((r) => roleShift(r)?.group === g.key);
+      const pItems        = prevRows.filter((r) => filterShift(r)?.group === g.key);
       const pQtyEach      = pItems.length ? sumBy(pItems, "qtyEach")  : null;
       const pQtyPack      = pItems.length ? sumBy(pItems, "qtyPack")  : null;
       const pSorted       = pItems.filter((r) => r.sort?.at).length;
@@ -2860,6 +3327,7 @@ function render() {
   }
   renderDailyDayNight(dailyRows);
   renderPeople(rows);
+  renderEmployeeSlotDashboard(rows);
   renderSlots(rows);
   renderWaves(rows);
   renderSlowRows(rows);
@@ -2874,13 +3342,76 @@ function render() {
   $("#exportBtn").disabled = isLoading || !(state.activeMenu === "daily" ? dailyRows.length : rows.length);
 }
 
+function renderDailyShiftOverview(rows) {
+  const mode = activeMode();
+  const summaries = dailyShiftSummary(rows, mode);
+  const roleRows = rowsForRole(rows, mode);
+  const hint = $("#dailyShiftHint");
+  if (hint) {
+    const basis = mode === "sort" ? "เวลา Sort / Slot Sort" : "เวลา Pick";
+    hint.textContent = `${roleLabel(mode)} · ${fmt.format(roleRows.length)} รายการ · ${basis}`;
+  }
+
+  const container = $("#dailyShiftCards");
+  if (!container) return;
+  if (!roleRows.length) {
+    container.innerHTML = `<div class="daily-shift-empty">ไม่มีข้อมูล</div>`;
+    return;
+  }
+
+  const totalQty = sumBy(roleRows, "qtyEach");
+  container.innerHTML = summaries
+    .map((summary) => {
+      const pct = totalQty ? (summary.qtyEach / totalQty) * 100 : 0;
+      return `
+        <div class="shift-card ${summary.colorClass}">
+          <div class="shift-card-header">
+            <span class="shift-card-emoji">${summary.emoji}</span>
+            <span class="shift-card-label">${html(summary.label)} <small>${html(summary.shortLabel)}</small></span>
+            <span class="shift-card-pct">${fmt1.format(pct)}% ของรวม</span>
+          </div>
+          <div class="daily-shift-window">
+            <span>เวลาปกติ ${html(summary.window)}</span>
+            <span>OT ${html(summary.otWindow)}</span>
+          </div>
+          <div class="shift-card-stats">
+            <div class="shift-stat">
+              <div class="shift-stat-value">${summary.branches ? fmt.format(summary.branches) : "–"}</div>
+              <div class="shift-stat-label">สาขา</div>
+            </div>
+            <div class="shift-stat">
+              <div class="shift-stat-value">${hourStat(summary.totalHours)}</div>
+              <div class="shift-stat-label">เวลารวม</div>
+            </div>
+            <div class="shift-stat">
+              <div class="shift-stat-value">${hourStat(summary.otHours)}</div>
+              <div class="shift-stat-label">OT ชั่วโมง</div>
+            </div>
+            <div class="shift-stat">
+              <div class="shift-stat-value">${summary.workers ? fmt.format(summary.workers) : "–"}</div>
+              <div class="shift-stat-label">คน</div>
+            </div>
+            <div class="shift-stat">
+              <div class="shift-stat-value">${summary.qtyEach ? fmt.format(summary.qtyEach) : "–"}</div>
+              <div class="shift-stat-label">ชิ้น</div>
+            </div>
+            <div class="shift-stat">
+              <div class="shift-stat-value">${summary.qtyPack ? fmt.format(summary.qtyPack) : "–"}</div>
+              <div class="shift-stat-label">แพ็ค</div>
+            </div>
+          </div>
+        </div>`;
+    })
+    .join("");
+}
+
 function renderDailyDayNight(rows) {
   const hint = $("#dayNightByDateHint");
   if (hint) hint.textContent = `${roleLabel()} · ยอดรวมต่อวัน แยก DAY / NIGHT`;
 
   const groupsByDate = new Map();
   rows.forEach((r) => {
-    const date = rowDate(r) || "(ไม่มีวันที่)";
+    const date = filterDate(r) || "(ไม่มีวันที่)";
     if (!groupsByDate.has(date)) groupsByDate.set(date, []);
     groupsByDate.get(date).push(r);
   });
@@ -2894,9 +3425,9 @@ function renderDailyDayNight(rows) {
   const lines = dates
     .map((date) => {
       const items = groupsByDate.get(date) || [];
-      const dayItems = items.filter((x) => roleShift(x)?.group === "day");
-      const nightItems = items.filter((x) => roleShift(x)?.group === "night");
-      const unassignedItems = items.filter((x) => !roleShift(x) || (roleShift(x)?.group !== "day" && roleShift(x)?.group !== "night"));
+      const dayItems = items.filter((x) => filterShift(x)?.group === "day");
+      const nightItems = items.filter((x) => filterShift(x)?.group === "night");
+      const unassignedItems = items.filter((x) => !filterShift(x) || (filterShift(x)?.group !== "day" && filterShift(x)?.group !== "night"));
       const dayQty = sumBy(dayItems, "qtyEach");
       const nightQty = sumBy(nightItems, "qtyEach");
       const unassignedQty = sumBy(unassignedItems, "qtyEach");

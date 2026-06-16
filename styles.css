@@ -1713,6 +1713,207 @@ tr.group-header {
 .rate-bar.rate-mid  { background: linear-gradient(90deg, #d97706, #fbbf24); }
 .rate-bar.rate-low  { background: linear-gradient(90deg, #dc2626, #f87171); }
 
+/* ─── Employee slot detail ─── */
+.employee-slot-panel {
+  overflow: hidden;
+}
+
+.employee-slot-wrap {
+  max-height: 560px;
+}
+
+.employee-slot-table {
+  min-width: 1180px;
+}
+
+.employee-slot-time {
+  min-width: 58px;
+  background: rgba(20, 184, 166, 0.16);
+  color: #99f6e4;
+  border: 1px solid rgba(45, 212, 191, 0.28);
+}
+
+.employee-slot-worker {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 170px;
+}
+
+.employee-slot-worker strong {
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.employee-slot-worker small {
+  color: #64748b;
+  font-size: 11px;
+  min-height: 14px;
+}
+
+.employee-slot-table .pick-num {
+  color: #5eead4;
+}
+
+.employee-slot-table .sort-num {
+  color: #93c5fd;
+}
+
+.employee-slot-total {
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+  min-width: 96px;
+}
+
+.employee-slot-total strong {
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.employee-slot-total span {
+  display: block;
+  width: 82px;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.employee-slot-total i {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #14b8a6, #60a5fa);
+}
+
+.employee-heatmap-panel {
+  overflow: hidden;
+}
+
+body[data-role-mode="pick"] [data-role-panel="sort"],
+body[data-role-mode="sort"] [data-role-panel="pick"] {
+  display: none !important;
+}
+
+body[data-role-mode="pick"] .role-filtered-grid,
+body[data-role-mode="sort"] .role-filtered-grid {
+  grid-template-columns: 1fr;
+}
+
+.employee-heatmap {
+  padding: 14px 16px 18px;
+}
+
+.heatmap-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.employee-hour-table {
+  min-width: 1420px;
+  border-spacing: 4px;
+  border-collapse: separate;
+  table-layout: fixed;
+}
+
+.employee-hour-table th,
+.employee-hour-table td {
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 7px;
+  padding: 8px 6px;
+  text-align: center;
+}
+
+.employee-hour-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: rgba(15, 23, 42, 0.98);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.employee-hour-person-head,
+.employee-hour-person {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  width: 190px;
+  min-width: 190px;
+  text-align: left !important;
+  background: rgba(15, 23, 42, 0.98) !important;
+}
+
+.employee-hour-person {
+  z-index: 2;
+  vertical-align: middle;
+}
+
+.employee-hour-person strong,
+.employee-hour-person small {
+  display: block;
+}
+
+.employee-hour-person strong {
+  color: #e2e8f0;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.employee-hour-person small {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.employee-hour-slot {
+  width: 52px;
+  min-width: 52px;
+}
+
+.employee-hour-cell {
+  height: 42px;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  background: rgba(30, 41, 59, 0.44);
+}
+
+.heatmap-pick .employee-hour-cell {
+  background: rgba(20, 184, 166, var(--heat));
+}
+
+.heatmap-sort .employee-hour-cell {
+  background: rgba(96, 165, 250, var(--heat));
+}
+
+.employee-hour-total-head,
+.employee-hour-total {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  width: 76px;
+  min-width: 76px;
+  background: rgba(15, 23, 42, 0.98) !important;
+}
+
+.employee-hour-total {
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.role-slot-employee-wrap {
+  max-height: 520px;
+}
+
 /* ─── Wave table ─── */
 .tag-wave {
   background: rgba(139,92,246,0.13);
@@ -2192,6 +2393,47 @@ tr.group-header {
 
 .shift-day::before   { background: linear-gradient(90deg, #b45309 0%, #fbbf24 50%, #fde68a 100%); box-shadow: 0 0 12px rgba(251,191,36,0.5); }
 .shift-night::before { background: linear-gradient(90deg, #3730a3 0%, #6366f1 50%, #a5b4fc 100%); box-shadow: 0 0 12px rgba(99,102,241,0.5); }
+
+/* ─── Daily shift summary ─── */
+.daily-shift-panel {
+  margin-bottom: 16px;
+}
+
+.daily-shift-cards .shift-card-label small {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0.68;
+}
+
+.daily-shift-window {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -12px 0 18px;
+}
+
+.daily-shift-window span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.5);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.daily-shift-empty {
+  grid-column: 1 / -1;
+  padding: 28px 20px;
+  color: #94a3b8;
+  text-align: center;
+  font-size: 13px;
+}
 
 /* ─── header row ─── */
 .shift-card-header {
