@@ -3483,18 +3483,47 @@ function renderPendingSort(rows) {
   const pendingDay = pendingRows.filter((r) => r.shift?.group === "day");
   const pendingNight = pendingRows.filter((r) => r.shift?.group === "night");
   const pendingOther = pendingRows.filter((r) => !r.shift || !["day", "night"].includes(r.shift?.group));
-
-  // Top 5 pending waves
+  // Group pending by wave, and then by product
   const waveMap = new Map();
   pendingRows.forEach((row) => {
-    const w = row.wave || "ไม่ทราบ";
-    if (!waveMap.has(w)) waveMap.set(w, { wave: w, count: 0, qtyEach: 0 });
-    const entry = waveMap.get(w);
-    entry.count += 1;
-    entry.qtyEach += row.qtyEach || 0;
+    const w = row.wave || "ไม่ระบุ Wave";
+    if (!waveMap.has(w)) {
+      waveMap.set(w, {
+        wave: w,
+        count: 0,
+        qtyEach: 0,
+        qtyPack: 0,
+        products: new Map()
+      });
+    }
+    const waveEntry = waveMap.get(w);
+    waveEntry.count += 1;
+    waveEntry.qtyEach += row.qtyEach || 0;
+    waveEntry.qtyPack += row.qtyPack || 0;
+
+    const pCode = productKey(row);
+    const pTitle = productTitle(row);
+    if (!waveEntry.products.has(pCode)) {
+      waveEntry.products.set(pCode, {
+        code: pCode,
+        name: pTitle,
+        count: 0,
+        qtyEach: 0,
+        qtyPack: 0,
+        branches: new Set()
+      });
+    }
+    const prodEntry = waveEntry.products.get(pCode);
+    prodEntry.count += 1;
+    prodEntry.qtyEach += row.qtyEach || 0;
+    prodEntry.qtyPack += row.qtyPack || 0;
+    if (row.branch) prodEntry.branches.add(row.branch);
   });
-  const topWaves = [...waveMap.values()].sort((a, b) => b.qtyEach - a.qtyEach).slice(0, 5);
-  const maxWaveQty = Math.max(...topWaves.map((w) => w.qtyEach), 1);
+
+  const sortedWaves = [...waveMap.values()].sort((a, b) => b.qtyEach - a.qtyEach).slice(0, 6);
+  sortedWaves.forEach((w) => {
+    w.sortedProducts = [...w.products.values()].sort((a, b) => b.qtyEach - a.qtyEach);
+  });
 
   container.innerHTML = `
     <div class="pending-sort-grid">
@@ -3538,25 +3567,55 @@ function renderPendingSort(rows) {
         </div>
       </div>
 
-      ${topWaves.length ? `
-      <div class="pending-waves-section">
-        <div class="pending-waves-title">📌 Wave ที่ค้างมากสุด</div>
-        <div class="pending-waves-list">
-          ${topWaves.map((w, i) => {
-            const pct = (w.qtyEach / maxWaveQty) * 100;
+      <div class="pending-lists-grid" style="grid-template-columns: 1fr; gap: 12px; padding-top: 8px;">
+        <div class="pending-waves-title" style="margin-bottom: 4px;">📦 รายการสินค้าที่ค้างแยกตาม Wave (คลิกที่กิ๊บเพื่อยุบ/ขยายดูสินค้าใน Wave)</div>
+        <div class="pending-waves-list" style="display: flex; flex-direction: column; gap: 10px;">
+          ${sortedWaves.map((w, i) => {
+            const openAttr = i === 0 ? "open" : "";
             return `
-            <div class="pending-wave-item">
-              <span class="pending-wave-rank">${i + 1}</span>
-              <span class="pending-wave-name">${html(w.wave)}</span>
-              <div class="pending-wave-bar-wrap">
-                <div class="pending-wave-bar" style="width:${pct}%"></div>
+            <details class="pending-wave-card" ${openAttr}>
+              <summary>
+                <div class="pending-wave-summary-left">
+                  <span class="pending-wave-toggle-icon">▶</span>
+                  <span class="tag tag-wave" style="font-size: 13px; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3);">${html(w.wave)}</span>
+                  <span class="pending-wave-summary-count" style="font-size: 12px; color: #94a3b8; font-weight: 600;">${fmt.format(w.count)} รายการค้าง</span>
+                </div>
+                <div class="pending-wave-summary-right">
+                  <span class="pending-wave-qty" style="font-size: 14px; font-weight: 900; color: #fbbf24;">
+                    ${fmt.format(w.qtyEach)} ชิ้น <span style="font-size: 11px; color: #94a3b8; font-weight: normal; margin-left: 2px;">(${fmt.format(w.qtyPack)} แพ็ค)</span>
+                  </span>
+                </div>
+              </summary>
+              <div class="pending-wave-products-list">
+                ${w.sortedProducts.map((p) => {
+                  const displayName = p.name !== p.code ? `${p.name} (${p.code})` : p.code;
+                  const branchList = [...p.branches];
+                  const branchHtml = branchList.length 
+                    ? branchList.map(b => `<span class="tag tag-branch" style="font-size: 10px; padding: 1px 5px; font-weight: 600; text-transform: uppercase;">${html(b)}</span>`).join("")
+                    : "";
+                  return `
+                  <div class="pending-product-row" title="รหัสสินค้า: ${html(p.code)}">
+                    <div class="pending-product-info">
+                      <strong class="pending-product-name">${html(p.name)}</strong>
+                      <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 4px;">
+                        <small class="pending-product-code">${html(p.code)}</small>
+                        ${branchHtml}
+                      </div>
+                    </div>
+                    <div class="pending-product-qty">
+                      <strong>${fmt.format(p.qtyEach)}</strong> <span style="font-size:11px; font-weight:normal; color:#94a3b8;">ชิ้น</span>
+                      <small style="font-size:11px; color:#f43f5e; font-weight:600; margin-top:2px;">(${fmt.format(p.qtyPack)} แพ็ค)</small>
+                    </div>
+                    <div class="pending-product-count">
+                      ${fmt.format(p.count)} รายการใบงาน
+                    </div>
+                  </div>`;
+                }).join("")}
               </div>
-              <span class="pending-wave-qty">${fmt.format(w.qtyEach)} ชิ้น</span>
-              <span class="pending-wave-count">${fmt.format(w.count)} รายการ</span>
-            </div>`;
+            </details>`;
           }).join("")}
         </div>
-      </div>` : ""}
+      </div>
     </div>`;
 }
 
