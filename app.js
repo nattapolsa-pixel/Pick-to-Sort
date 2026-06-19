@@ -954,7 +954,7 @@ function calculateAvgStaffProductivity(rows) {
   ].filter(Boolean));
   
   let totalWorkers = 0;
-  let sumRatesEach = 0;
+  let sumRatesPack = 0;
   
   workerCodes.forEach(code => {
     const pickerRows = rows.filter(r => r.picker.code === code && r.pick.at);
@@ -991,14 +991,14 @@ function calculateAvgStaffProductivity(rows) {
     
     const activeHours = activeMinutes / 60;
     if (activeHours > 0) {
-      const qtyEach = sumBy(pickerRows, "qtyEach") + sumBy(sorterRows, "qtyEach");
-      sumRatesEach += qtyEach / activeHours;
+      const qtyPack = sumBy(pickerRows, "qtyPack") + sumBy(sorterRows, "qtyPack");
+      sumRatesPack += qtyPack / activeHours;
       totalWorkers += 1;
     }
   });
   
   return {
-    avgEach: totalWorkers > 0 ? sumRatesEach / totalWorkers : 0,
+    avgPack: totalWorkers > 0 ? sumRatesPack / totalWorkers : 0,
     totalWorkers,
   };
 }
@@ -1044,19 +1044,20 @@ function calculateTotalProductivity(rows) {
   });
   
   const totalActiveHours = totalActiveMinutes / 60;
-  const totalQtyEach = sumBy(rows, "qtyEach");
-  const productivity = totalActiveHours > 0 ? totalQtyEach / totalActiveHours : 0;
+  const totalQtyPack = sumBy(rows, "qtyPack");
+  const productivity = totalActiveHours > 0 ? totalQtyPack / totalActiveHours : 0;
   
   return {
     productivity,
     totalActiveHours,
-    totalQtyEach,
+    totalQtyPack,
+    totalQtyEach: sumBy(rows, "qtyEach"),
   };
 }
 
 function calculateProductivityByShift(rows, shiftGroup) {
   const filteredRows = rows.filter(row => row.shift?.group === shiftGroup);
-  if (!filteredRows.length) return { productivity: 0, totalActiveHours: 0, totalQtyEach: 0 };
+  if (!filteredRows.length) return { productivity: 0, totalActiveHours: 0, totalQtyPack: 0, totalQtyEach: 0 };
   
   const workerCodes = new Set([
     ...filteredRows.map(r => r.picker.code),
@@ -1098,13 +1099,14 @@ function calculateProductivityByShift(rows, shiftGroup) {
   });
   
   const totalActiveHours = totalActiveMinutes / 60;
-  const totalQtyEach = sumBy(filteredRows, "qtyEach");
-  const productivity = totalActiveHours > 0 ? totalQtyEach / totalActiveHours : 0;
+  const totalQtyPack = sumBy(filteredRows, "qtyPack");
+  const productivity = totalActiveHours > 0 ? totalQtyPack / totalActiveHours : 0;
   
   return {
     productivity,
     totalActiveHours,
-    totalQtyEach,
+    totalQtyPack,
+    totalQtyEach: sumBy(filteredRows, "qtyEach"),
   };
 }
 
@@ -1128,8 +1130,6 @@ function renderKpis(rows, prevRows = []) {
   const notCountedQtyEach = sumBy(notCountedRows, "rawQtyEach");
   const notCountedQtyPack = sumBy(notCountedRows, "rawQtyPack");
   const totalProd = calculateRoleProductivity(rows, mode);
-  const dayProd = calculateRoleProductivityByShift(rows, mode, "day");
-  const nightProd = calculateRoleProductivityByShift(rows, mode, "night");
   const workerCount = uniqueCount(roleRows, (row) => roleWorker(row, mode).code);
 
   // branch counts (total / day / night)
@@ -1151,8 +1151,6 @@ function renderKpis(rows, prevRows = []) {
   const pWorkers       = hasPrev ? uniqueCount(prevRoleRows, (r) => roleWorker(r, mode).code) : null;
   const pWaveCount     = hasPrev ? uniqueCount(prevQtyRows, (r) => r.wave) : null;
   const pTotalProd     = hasPrev ? calculateRoleProductivity(prevRows, mode) : null;
-  const pDayProd       = hasPrev ? calculateRoleProductivityByShift(prevRows, mode, "day") : null;
-  const pNightProd     = hasPrev ? calculateRoleProductivityByShift(prevRows, mode, "night") : null;
   const pBranchTotal   = hasPrev ? new Set(prevQtyRows.map(r => r.branch).filter(Boolean)).size : null;
   const pBranchDay     = hasPrev ? new Set(prevQtyRows.filter(r => roleShift(r, mode)?.group === "day").map(r => r.branch).filter(Boolean)).size : null;
   const pBranchNight   = hasPrev ? new Set(prevQtyRows.filter(r => roleShift(r, mode)?.group === "night").map(r => r.branch).filter(Boolean)).size : null;
@@ -1164,7 +1162,7 @@ function renderKpis(rows, prevRows = []) {
 
   const productivityNote = (prod) => {
     const basis = mode === "sort" ? " จาก Slot Sort" : "";
-    return `${fmt.format(prod.totalQtyEach)} ชิ้น / ${fmt1.format(prod.totalActiveHours)} ชม.${basis}`;
+    return `${fmt.format(prod.totalQtyPack)} แพ็ค / ${fmt1.format(prod.totalActiveHours)} ชม.${basis}`;
   };
 
   const kpis = [
@@ -1206,24 +1204,10 @@ function renderKpis(rows, prevRows = []) {
     {
       color: "cyan",
       label: `Productivity ${label}`,
-      value: `${fmt1.format(totalProd.productivity)} ชิ้น/hr`,
+      value: `${fmt1.format(totalProd.productivity)} แพ็ค/hr`,
       note: productivityNote(totalProd),
       delta: hasPrev && pTotalProd ? kpiDelta(totalProd.productivity, pTotalProd.productivity) : "",
     },
-    ...(dayProd.totalQtyEach > 0 ? [{
-      color: "amber",
-      label: `${label} Productivity DAY`,
-      value: `${fmt1.format(dayProd.productivity)} ชิ้น/hr`,
-      note: productivityNote(dayProd),
-      delta: hasPrev && pDayProd ? kpiDelta(dayProd.productivity, pDayProd.productivity) : "",
-    }] : []),
-    ...(nightProd.totalQtyEach > 0 ? [{
-      color: "indigo",
-      label: `${label} Productivity NIGHT`,
-      value: `${fmt1.format(nightProd.productivity)} ชิ้น/hr`,
-      note: productivityNote(nightProd),
-      delta: hasPrev && pNightProd ? kpiDelta(nightProd.productivity, pNightProd.productivity) : "",
-    }] : []),
     ...(branchTotal > 0 ? [{
       color: "green",
       label: `สาขาทั้งหมด`,
@@ -1281,13 +1265,15 @@ function calculateRoleProductivity(rows, mode) {
   });
 
   const activeHours = activeMinutes / 60;
-  const qtyEach = sumBy(roleRows, "qtyEach");
+  const qtyPack = sumBy(roleRows, "qtyPack");
   return {
     activeHours,
     totalActiveHours: activeHours,
-    productivity: activeHours ? qtyEach / activeHours : 0,
-    qtyEach,
-    totalQtyEach: qtyEach,
+    productivity: activeHours ? qtyPack / activeHours : 0,
+    qtyPack,
+    totalQtyPack: qtyPack,
+    qtyEach: sumBy(roleRows, "qtyEach"),
+    totalQtyEach: sumBy(roleRows, "qtyEach"),
     rows: roleRows,
     basisLabel: activeMode(mode) === "sort" ? "Slot Sort" : "เวลาแรก-สุดท้าย",
   };
@@ -1405,7 +1391,7 @@ function renderRoleSplit(rows) {
         roleStat("แพ็ค", fmt.format(sumBy(pickRows, "qtyPack"))),
         roleStat("รายการ", fmt.format(pickRows.length)),
         roleStat("Wave", fmt.format(uniqueCount(pickRows, (row) => row.wave))),
-        roleStat("ชิ้น/hr", pickProd.activeHours ? fmt1.format(pickProd.productivity) : "-", `${fmt1.format(pickProd.activeHours)} ชม.`),
+        roleStat("แพ็ค/hr", pickProd.activeHours ? fmt1.format(pickProd.productivity) : "-", `${fmt1.format(pickProd.activeHours)} ชม.`),
         roleStat("Picker", fmt.format(uniqueCount(pickRows, (row) => row.picker.code))),
       ],
     },
@@ -1418,7 +1404,7 @@ function renderRoleSplit(rows) {
         roleStat("แพ็ค", fmt.format(sumBy(sortRows, "qtyPack"))),
         roleStat("รายการ", fmt.format(sortRows.length)),
         roleStat("Sort ครบ", pickRows.length ? `${fmt1.format(sortRate)}%` : "-"),
-        roleStat("ชิ้น/hr", sortProd.activeHours ? fmt1.format(sortProd.productivity) : "-", `${fmt1.format(sortProd.activeHours)} ชม.`),
+        roleStat("แพ็ค/hr", sortProd.activeHours ? fmt1.format(sortProd.productivity) : "-", `${fmt1.format(sortProd.activeHours)} ชม.`),
         roleStat("Sorter", fmt.format(uniqueCount(sortRows, (row) => row.sorter.code))),
       ],
     },
@@ -2330,7 +2316,7 @@ function productSummary(rows, mode = state.peopleMode) {
         avgMinutesPerRow: items.length ? workMinutes / items.length : null,
         avgMinutesPerWave: waveCount ? workMinutes / waveCount : null,
         qtyPerWave: waveCount ? qtyEach / waveCount : null,
-        qtyPerHour: activeHours ? qtyEach / activeHours : null,
+        packPerHour: activeHours ? qtyPack / activeHours : null,
       };
     })
     .sort((a, b) => b.qtyEach - a.qtyEach || b.rowCount - a.rowCount || a.code.localeCompare(b.code));
@@ -2347,20 +2333,21 @@ function productWaveSummary(rows, mode = state.peopleMode) {
       const workMinutes = roleWorkMinutesForRows(items, mode);
       const activeHours = workMinutes / 60;
       const qtyEach = sumBy(items, "qtyEach");
+      const qtyPack = sumBy(items, "qtyPack");
       return {
         wave: first.wave || "(ไม่มี Wave)",
         date: rowDate(first, mode),
         code: productKey(first),
         name: productTitle(items.find((row) => row.productName) || first),
         qtyEach,
-        qtyPack: sumBy(items, "qtyPack"),
+        qtyPack,
         rowCount: items.length,
         branchCount: branches.size,
         workerCount: workers.size,
         workMinutes,
         activeHours,
         avgMinutesPerRow: items.length ? workMinutes / items.length : null,
-        qtyPerHour: activeHours ? qtyEach / activeHours : null,
+        packPerHour: activeHours ? qtyPack / activeHours : null,
       };
     })
     .sort((a, b) => b.qtyEach - a.qtyEach || a.wave.localeCompare(b.wave) || a.code.localeCompare(b.code));
@@ -2390,7 +2377,7 @@ function renderProductItems(rows) {
       ["cyan", "สินค้า", fmt.format(products.length), `${fmt.format(roleRows.length)} รายการ ${label}`],
       ["green", "ยอดชิ้นรวม", fmt.format(totalQty), `${fmt.format(totalPack)} แพ็ค`],
       ["amber", "เฉลี่ยเวลา / 1 Wave", metricMinutes(avgProductWaveMinutes), `${fmt.format(productWaves.length)} แถวสินค้า/Wave`],
-      ["rose", "ยอด / ชั่วโมง", overview.activeHours ? `${fmt1.format(totalQty / overview.activeHours)} ชิ้น/hr` : "-", `${fmt1.format(overview.activeHours)} ชม.รวม`],
+      ["rose", "แพ็ค / ชั่วโมง", overview.activeHours ? `${fmt1.format(totalPack / overview.activeHours)} แพ็ค/hr` : "-", `${fmt1.format(overview.activeHours)} ชม.รวม`],
     ];
     kpiGrid.innerHTML = cards
       .map(([tone, title, value, note]) => `
@@ -2435,7 +2422,7 @@ function renderProductItems(rows) {
             <td class="num">${metricMinutes(entry.workMinutes)}</td>
             <td class="num">${metricMinutes(entry.avgMinutesPerRow)}</td>
             <td class="num">${metricMinutes(entry.avgMinutesPerWave)}</td>
-            <td class="num">${entry.qtyPerHour ? fmt1.format(entry.qtyPerHour) : "-"}</td>
+            <td class="num">${entry.packPerHour ? fmt1.format(entry.packPerHour) : "-"}</td>
           </tr>`;
       }).join("");
     }
@@ -2465,7 +2452,7 @@ function renderProductItems(rows) {
           <td class="num">${fmt.format(entry.workerCount)}</td>
           <td class="num">${metricMinutes(entry.workMinutes)}</td>
           <td class="num">${metricMinutes(entry.avgMinutesPerRow)}</td>
-          <td class="num">${entry.qtyPerHour ? fmt1.format(entry.qtyPerHour) : "-"}</td>
+          <td class="num">${entry.packPerHour ? fmt1.format(entry.packPerHour) : "-"}</td>
         </tr>`).join("");
     }
   }
@@ -2933,7 +2920,7 @@ function overviewExcelSheets(rows, prevRows) {
     ["Items", uniqueCount(qtyRows, (row) => row.item)],
     ["Waves", uniqueCount(qtyRows, (row) => row.wave)],
     ["Sort สำเร็จ %", sortRate],
-    ["Productivity ชิ้น/hr", prod.productivity],
+    ["Productivity แพ็ค/hr", prod.productivity],
     ["Active hours", prod.totalActiveHours],
   ];
 
@@ -2999,7 +2986,7 @@ function dailyDayNightRows(rows) {
 
 function dailyShiftSummaryRows(rows) {
   return [
-    ["กะ", "ช่วงเวลาปกติ", "ช่วงเวลา OT", "Qty ชิ้น", "Qty แพ็ค", "รายการ", "คน", "สาขา", "เวลารวม ชั่วโมง", "OT ชั่วโมง", "Productivity ชิ้น/hr"],
+    ["กะ", "ช่วงเวลาปกติ", "ช่วงเวลา OT", "Qty ชิ้น", "Qty แพ็ค", "รายการ", "คน", "สาขา", "เวลารวม ชั่วโมง", "OT ชั่วโมง", "Productivity แพ็ค/hr"],
     ...dailyShiftSummary(rows, activeMode()).map((summary) => [
       `${summary.label} ${summary.shortLabel}`,
       summary.window,
@@ -3106,6 +3093,7 @@ function productExcelSheets(rows) {
   const overview = roleWorkTimeSummary(rows, mode);
   const roleRows = rowsForRole(rows, mode);
   const totalQty = sumBy(roleRows, "qtyEach");
+  const totalPack = sumBy(roleRows, "qtyPack");
   const productWaveMinutes = productWaves.reduce((sum, entry) => sum + entry.workMinutes, 0);
   return [
     {
@@ -3116,17 +3104,17 @@ function productExcelSheets(rows) {
         ["สินค้า", products.length],
         ["รายการ", roleRows.length],
         ["Qty ชิ้น", totalQty],
-        ["Qty แพ็ค", sumBy(roleRows, "qtyPack")],
+        ["Qty แพ็ค", totalPack],
         ["เวลารวม ชั่วโมง", overview.activeHours],
         ["เฉลี่ย นาที/รายการ", overview.avgMinutesPerRow || ""],
         ["เฉลี่ย นาที/สินค้า-Wave", productWaves.length ? productWaveMinutes / productWaves.length : ""],
-        ["ยอดชิ้น/ชั่วโมง", overview.activeHours ? totalQty / overview.activeHours : ""],
+        ["แพ็ค/ชั่วโมง", overview.activeHours ? totalPack / overview.activeHours : ""],
       ],
     },
     {
       name: "Products",
       rows: [
-        ["รหัสสินค้า", "ชื่อสินค้า", "Qty ชิ้น", "Qty แพ็ค", "รายการ", "Wave", "สาขา", "คน", "เวลารวม นาที", "เฉลี่ย นาที/รายการ", "เฉลี่ย นาที/1 Wave", "ชิ้น/ชั่วโมง", "ชิ้น/Wave"],
+        ["รหัสสินค้า", "ชื่อสินค้า", "Qty ชิ้น", "Qty แพ็ค", "รายการ", "Wave", "สาขา", "คน", "เวลารวม นาที", "เฉลี่ย นาที/รายการ", "เฉลี่ย นาที/1 Wave", "แพ็ค/ชั่วโมง", "ชิ้น/Wave"],
         ...products.map((entry) => [
           entry.code,
           entry.name,
@@ -3139,7 +3127,7 @@ function productExcelSheets(rows) {
           entry.workMinutes,
           entry.avgMinutesPerRow || "",
           entry.avgMinutesPerWave || "",
-          entry.qtyPerHour || "",
+          entry.packPerHour || "",
           entry.qtyPerWave || "",
         ]),
       ],
@@ -3147,7 +3135,7 @@ function productExcelSheets(rows) {
     {
       name: "Product Wave",
       rows: [
-        ["Wave", "วันที่", "รหัสสินค้า", "ชื่อสินค้า", "Qty ชิ้น", "Qty แพ็ค", "รายการ", "สาขา", "คน", "เวลางาน นาที", "เฉลี่ย นาที/รายการ", "ชิ้น/ชั่วโมง"],
+        ["Wave", "วันที่", "รหัสสินค้า", "ชื่อสินค้า", "Qty ชิ้น", "Qty แพ็ค", "รายการ", "สาขา", "คน", "เวลางาน นาที", "เฉลี่ย นาที/รายการ", "แพ็ค/ชั่วโมง"],
         ...productWaves.map((entry) => [
           entry.wave,
           entry.date,
@@ -3160,7 +3148,7 @@ function productExcelSheets(rows) {
           entry.workerCount,
           entry.workMinutes,
           entry.avgMinutesPerRow || "",
-          entry.qtyPerHour || "",
+          entry.packPerHour || "",
         ]),
       ],
     },
@@ -3618,9 +3606,9 @@ function render() {
       const totalQtyPack = sumBy(items, "qtyPack");
       const sorted       = items.filter((r) => r.sort?.at).length;
       const sortedRate   = items.length ? (sorted / items.length) * 100 : 0;
-      const avgCycle     = mean(items.map((r) => r.cycleMinutes));
-      const workTime     = roleWorkTimeSummary(items, mode);
+      const productivity = calculateRoleProductivity(items, mode);
       const workers      = uniqueCount(items, (r) => roleWorker(r).code);
+      const waves        = uniqueCount(items, (r) => r.wave);
       const branches     = new Set(items.map((r) => r.branch).filter(Boolean)).size;
       const pct          = total.qtyEach ? (totalQtyEach / total.qtyEach) * 100 : 0;
 
@@ -3630,11 +3618,11 @@ function render() {
       const pQtyPack      = pItems.length ? sumBy(pItems, "qtyPack")  : null;
       const pSorted       = pItems.filter((r) => r.sort?.at).length;
       const pSortedRate   = pItems.length ? (pSorted / pItems.length) * 100 : null;
-      const pAvgCycle     = pItems.length ? mean(pItems.map((r) => r.cycleMinutes)) : null;
-      const pWorkTime     = roleWorkTimeSummary(pItems, mode);
+      const pProductivity = calculateRoleProductivity(pItems, mode);
       const pWorkers      = pItems.length
         ? uniqueCount(pItems, (r) => roleWorker(r).code)
         : null;
+      const pWaves        = pItems.length ? uniqueCount(pItems, (r) => r.wave) : null;
       const pBranches     = pItems.length
         ? new Set(pItems.map((r) => r.branch).filter(Boolean)).size
         : null;
@@ -3669,12 +3657,16 @@ function render() {
               ${mode !== "sort" && hasPrev && pSortedRate !== null ? `<div class="shift-stat-prev">${fmt1.format(pSortedRate)}%</div>` : ""}
             </div>
             <div class="shift-stat">
-              <div class="shift-stat-value">${mode === "sort" ? metricMinutes(workTime.avgMinutesPerRow) : (avgCycle !== null ? `${fmt1.format(avgCycle)}<span class='shift-stat-unit'>นาที</span>` : "–")}</div>
-              <div class="shift-stat-label">${mode === "sort" ? "เฉลี่ย/รายการ" : "เฉลี่ย Pick→Sort"}</div>
-              ${mode === "sort" && hasPrev && pWorkTime.avgMinutesPerRow !== null ? deltaHtml(workTime.avgMinutesPerRow, pWorkTime.avgMinutesPerRow, true) : ""}
-              ${mode === "sort" && hasPrev && pWorkTime.avgMinutesPerRow !== null ? `<div class="shift-stat-prev">${fmt1.format(pWorkTime.avgMinutesPerRow)} นาที</div>` : ""}
-              ${mode !== "sort" && hasPrev && pAvgCycle !== null ? deltaHtml(avgCycle, pAvgCycle, true) : ""}
-              ${mode !== "sort" && hasPrev && pAvgCycle !== null ? `<div class="shift-stat-prev">${fmt1.format(pAvgCycle)} นาที</div>` : ""}
+              <div class="shift-stat-value">${fmt.format(waves)}</div>
+              <div class="shift-stat-label">Wave</div>
+              ${hasPrev ? deltaHtml(waves, pWaves) : ""}
+              ${hasPrev ? `<div class="shift-stat-prev">${fmt.format(pWaves)} Wave</div>` : ""}
+            </div>
+            <div class="shift-stat">
+              <div class="shift-stat-value">${productivity.totalQtyPack ? `${fmt1.format(productivity.productivity)}<span class='shift-stat-unit'>แพ็ค/hr</span>` : "–"}</div>
+              <div class="shift-stat-label">Productivity</div>
+              ${hasPrev && pProductivity.totalQtyPack ? deltaHtml(productivity.productivity, pProductivity.productivity) : ""}
+              ${hasPrev && pProductivity.totalQtyPack ? `<div class="shift-stat-prev">${fmt1.format(pProductivity.productivity)} แพ็ค/hr</div>` : ""}
             </div>
             <div class="shift-stat">
               <div class="shift-stat-value">${fmt.format(branches)}</div>
