@@ -844,11 +844,11 @@ function filterShift(record, mode = state.peopleMode) {
 }
 
 function filterDate(record, mode = state.peopleMode) {
-  return workDate(record);
+  return roleTime(record, mode)?.date || roleShift(record, mode)?.date || "";
 }
 
 function rowDate(record, mode = state.peopleMode) {
-  return workDate(record);
+  return roleTime(record, mode)?.date || roleShift(record, mode)?.date || "";
 }
 
 function workDate(record) {
