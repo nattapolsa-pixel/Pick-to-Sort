@@ -98,6 +98,28 @@ const SHIFT_SUMMARY_ROWS = [
   { key: "transition", label: "พัก/เปลี่ยนกะ", window: "16:00-16:30 / 04:00-04:30", group: "transition" },
 ];
 
+const FIXED_DATA_MIN_COLUMNS = 19;
+const FIXED_DATA_COLUMN_INDEXES = {
+  qtyEach: 1,     // B
+  qtyPack: 2,     // C
+  wave: 3,        // D
+  pickCode: 4,    // E
+  sortCode: 5,    // F
+  pickAt: -1,     // Do not use raw timestamp columns for dashboard dates.
+  sortAt: -1,
+  pickDate: 8,    // I
+  pickTime: 9,    // J
+  pickSlot: 10,   // K
+  pickShift: 11,  // L
+  sortDate: 12,   // M
+  sortTime: 13,   // N
+  sortSlot: 14,   // O
+  sortShift: 15,  // P
+  branch: 16,     // Q
+  productCode: 17, // R
+  productName: 18, // S
+};
+
 const msCache = new Map();
 
 function gvizUrl(callbackName, source = config) {
@@ -241,6 +263,15 @@ function columnIndex(columnMap, candidates) {
     if (columnMap.has(key)) return columnMap.get(key);
   }
   return -1;
+}
+
+function usesFixedDataColumnLayout(source = config, columnCount = 0) {
+  return (
+    String(source?.sheetId || "") === String(DEFAULT_CONFIG.sheetId) &&
+    String(source?.gid || "") === String(DEFAULT_CONFIG.gid) &&
+    normalizeHeader(source?.sheetName || "") === normalizeHeader(DEFAULT_CONFIG.sheetName) &&
+    columnCount >= FIXED_DATA_MIN_COLUMNS
+  );
 }
 
 function normalizeCode(value) {
@@ -616,7 +647,11 @@ function normalizeRecords(rawRows) {
   const indexes = Object.fromEntries(
     Object.entries(COLUMN_CANDIDATES).map(([key, candidates]) => [key, columnIndex(columnMap, candidates)])
   );
-  const missing = missingRequiredFields(indexes);
+  const columnCount = Math.max(technicalHeaders.length, displayHeaders.length);
+
+  if (usesFixedDataColumnLayout(config, columnCount)) {
+    Object.assign(indexes, FIXED_DATA_COLUMN_INDEXES);
+  }
 
   // Fallback: fixed Data columns keep quantities usable even when Google hides text headers in numeric columns.
   if (indexes.qtyEach < 0 && technicalHeaders.length >= 2) {
